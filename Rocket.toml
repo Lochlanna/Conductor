@@ -1,0 +1,3 @@
+[global.databases.quest_db]
+url = "postgresql://admin:quest@localhost:8812/qdb"
+pool_size = 3
