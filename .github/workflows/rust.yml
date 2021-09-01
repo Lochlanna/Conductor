@@ -32,8 +32,8 @@ jobs:
           args: --target aarch64-unknown-linux-gnu --release --verbose
       - uses: actions/upload-artifact@v2.2.4
         with:
-          name: iq_grow-arm
-          path: target/aarch64-unknown-linux-gnu/release/iq_grow
+          name: conductor-arm
+          path: target/aarch64-unknown-linux-gnu/release/conductor
 
   build-nix:
     runs-on: ubuntu-latest
@@ -57,8 +57,8 @@ jobs:
           args: --target x86_64-unknown-linux-gnu --release --verbose
       - uses: actions/upload-artifact@v2.2.4
         with:
-          name: iq_grow-nix
-          path: target/x86_64-unknown-linux-gnu/release/iq_grow
+          name: conductor-nix
+          path: target/x86_64-unknown-linux-gnu/release/conductor
 
   build-win:
     runs-on: ubuntu-latest
@@ -82,5 +82,5 @@ jobs:
           args: --target x86_64-pc-windows-gnu --release --verbose
       - uses: actions/upload-artifact@v2.2.4
         with:
-          name: iq_grow-win
-          path: target/x86_64-pc-windows-gnu/release/iq_grow.exe
+          name: conductor-win
+          path: target/x86_64-pc-windows-gnu/release/conductor.exe
