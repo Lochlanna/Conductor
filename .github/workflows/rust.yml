@@ -1,0 +1,59 @@
+name: Rust
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          components: rustfmt, clippy
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --target aarch64-unknown-linux-gnu --release --verbose
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --target x86_64-unknown-linux-gnu --release --verbose
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --target x86_64-pc-windows-gnu --release --verbose
+
+      - uses: actions/upload-artifact@v2.2.4
+        with:
+          name: iq_grow-arm
+          path: target/aarch64-unknown-linux-gnu/release/iq_grow
+      - uses: actions/upload-artifact@v2.2.4
+        with:
+          name: iq_grow-nix
+          path: target/x86_64-unknown-linux-gnu/release/iq_grow
+      - uses: actions/upload-artifact@v2.2.4
+        with:
+          name: iq_grow-win
+          path: target/x86_64-pc-windows-gnu/release/iq_grow.exe
