@@ -11,8 +11,12 @@ rmp-serde = "0.15.*"
 serde_json = "1.0.0"
 log = "0.4.*"
 simple_logger = "1.13.*"
-rocket = "0.5.0-rc.1"
-rocket_sync_db_pools = { version = "0.1.0-rc.1", default-features = false, features = [
+rocket = { git = "https://github.com/Lochlanna/Rocket.git", branch = "msgpack_named", features = [
+    "json",
+    "msgpack",
+    "uuid",
+] }
+rocket_sync_db_pools = { git = "https://github.com/Lochlanna/Rocket.git", branch = "msgpack_named", features = [
     "postgres_pool",
 ] }
 postgres = { version = "0.19.*", features = [
