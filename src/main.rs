@@ -1,8 +1,7 @@
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 mod db;
-mod nice_log;
-mod register;
+mod producer;
 
 #[macro_use]
 extern crate rocket;
@@ -14,6 +13,9 @@ fn rocket() -> _ {
         .init()
         .unwrap();
     rocket::build()
-        .mount("/", routes![register::register_producer_json, register::register_producer_pack])
+        .mount(
+            "/",
+            routes![producer::register_json, producer::register_pack],
+        )
         .attach(db::QuestDbConn::fairing())
 }
