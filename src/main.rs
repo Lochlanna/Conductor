@@ -1,4 +1,5 @@
 use log::LevelFilter;
+use rocket::fairing::AdHoc;
 use simple_logger::SimpleLogger;
 mod db;
 mod producer;
@@ -18,4 +19,8 @@ fn rocket() -> _ {
             routes![producer::register_json, producer::register_pack],
         )
         .attach(db::QuestDbConn::fairing())
+        .attach(AdHoc::on_ignite(
+            "Creat application tables",
+            db::create_app_schema,
+        ))
 }
