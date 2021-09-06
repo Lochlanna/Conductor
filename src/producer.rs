@@ -129,16 +129,21 @@ impl Registration {
         }
     }
 
+    #[inline]
+    fn generate_data_for_creation(&self, uuid: &str) -> (String, String, String, String) {
+        (
+            self.generate_table_sql(uuid),
+            self.name.clone(),
+            self.get_schema_as_json_str(),
+            uuid.to_string(),
+        )
+    }
+
     async fn persist(&self, db: &db::QuestDbConn) -> Result<String, ErrorCode> {
         let uuid = self.get_uuid();
+        let (create_table_sql, producer_name, schema_json, uuid_copy) =
+            self.generate_data_for_creation(&uuid);
 
-        let create_table_sql = self.generate_table_sql(&uuid);
-        let producer_name = self.name.clone(); // this will be moved inside the lambda so we need a copy
-        let schema_json = self.get_schema_as_json_str();
-        if schema_json.is_empty() {
-            return Err(ErrorCode::InternalError);
-        }
-        let uuid_copy = uuid.clone(); // this will be moved inside the lambda so we need a copy
         let result: Result<u64, _> = db
             .run(move |conn: &mut postgres::Client| {
                 //we will do both these in one go so that we don't add it to the producers table unless we were able to create its data table
