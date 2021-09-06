@@ -35,7 +35,7 @@ impl DataTypes {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 enum ErrorCode {
     NoError = 0,
     TimestampDefined = 1,
@@ -44,6 +44,7 @@ enum ErrorCode {
     TooManyColumns = 4, // who is doing this???
     InternalError = 5,
     InvalidCustomId = 6,
+    NameInvalid = 7,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -63,7 +64,15 @@ macro_rules! logErrorWithJson {
 }
 
 impl Registration {
-    fn schema_valid(&self) -> ErrorCode {
+    fn valid(&self) -> ErrorCode {
+        if self.name.is_empty() {
+            return ErrorCode::NameInvalid;
+        }
+        if let Some(custom_id) = &self.use_custom_id {
+            if custom_id.is_empty() || custom_id.contains('.') || custom_id.contains('\"') {
+                return ErrorCode::InvalidCustomId;
+            }
+        }
         if self.schema.contains_key("ts") {
             logErrorWithJson!(
                 self,
@@ -100,6 +109,61 @@ impl Registration {
         sql += ") timestamp(ts);";
         sql
     }
+
+    #[inline]
+    fn get_uuid(&self) -> String {
+        match &self.use_custom_id {
+            Some(custom_id) => custom_id.clone(),
+            None => Uuid::new_v4().to_string(),
+        }
+    }
+
+    #[inline]
+    fn get_schema_as_json_str(&self) -> String {
+        match serde_json::to_string(&self.schema) {
+            Ok(v) => v,
+            Err(err) => {
+                log::error!("Couldn't serialize producer schema into json: {}", err);
+                String::new()
+            }
+        }
+    }
+
+    async fn persist(&self, db: &db::QuestDbConn) -> Result<String, ErrorCode> {
+        let uuid = self.get_uuid();
+
+        let create_table_sql = self.generate_table_sql(&uuid);
+        let producer_name = self.name.clone(); // this will be moved inside the lambda so we need a copy
+        let schema_json = self.get_schema_as_json_str();
+        if schema_json.is_empty() {
+            return Err(ErrorCode::InternalError);
+        }
+        let uuid_copy = uuid.clone(); // this will be moved inside the lambda so we need a copy
+        let result: Result<u64, _> = db
+            .run(move |conn: &mut postgres::Client| {
+                //we will do both these in one go so that we don't add it to the producers table unless we were able to create its data table
+                log::info!("creating table with sql {}", create_table_sql);
+                let result = conn.execute(create_table_sql.as_str(), &[]);
+                if result.is_err() {
+                    return result;
+                }
+                conn.execute(
+                    "INSERT INTO producers VALUES($1, $2, $3);",
+                    &[&producer_name, &uuid_copy, &schema_json],
+                )
+            })
+            .await;
+        match result {
+            Ok(_) => Ok(uuid),
+            Err(err) => {
+                log::error!(
+                    "There was an error persisting the producer to the db: {}",
+                    err
+                );
+                Err(ErrorCode::InternalError)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -109,57 +173,21 @@ pub struct RegistrationResult {
 }
 
 async fn register(db: &db::QuestDbConn, data: &Registration) -> RegistrationResult {
-    match data.schema_valid() {
-        ErrorCode::NoError => {
-            let uuid;
-            if data.use_custom_id.is_some() {
-                uuid = data
-                    .use_custom_id
-                    .as_ref()
-                    .expect("Couldn't unwrap value that has already been checked as not none...")
-                    .clone();
-                if uuid.is_empty() {
-                    return RegistrationResult {
-                        error: ErrorCode::InvalidCustomId as u8,
-                        uuid: None,
-                    };
-                }
-            } else {
-                uuid = Uuid::new_v4().to_string();
-            }
-            let sql = data.generate_table_sql(&(uuid.to_string()));
-            let name = data.name.clone();
-            let schema = serde_json::to_string(&data.schema).unwrap();
-            let uuid_copy = uuid.clone();
-            let result: Result<u64, _> = db
-                .run(move |conn: &mut postgres::Client| {
-                    log::info!("creating table with sql {}", sql);
-                    let result = conn.execute(sql.as_str(), &[]);
-                    if result.is_err() {
-                        return result;
-                    }
-                    conn.execute(
-                        "INSERT INTO producers VALUES($1, $2, $3);",
-                        &[&name, &uuid_copy, &schema],
-                    )
-                })
-                .await;
-            match result {
-                Ok(_) => RegistrationResult {
-                    error: data.schema_valid() as u8,
-                    uuid: Some(uuid),
-                },
-                Err(error) => {
-                    log::error!("There was an issue creating producer data store: {}", error);
-                    RegistrationResult {
-                        error: ErrorCode::InternalError as u8,
-                        uuid: None,
-                    }
-                }
-            }
-        }
-        _ => RegistrationResult {
-            error: data.schema_valid() as u8,
+    let error_code = data.valid();
+    if error_code != ErrorCode::NoError {
+        return RegistrationResult {
+            error: error_code as u8,
+            uuid: None,
+        };
+    }
+
+    match data.persist(db).await {
+        Ok(uuid) => RegistrationResult {
+            error: error_code as u8,
+            uuid: Some(uuid),
+        },
+        Err(err) => RegistrationResult {
+            error: err as u8,
             uuid: None,
         },
     }
