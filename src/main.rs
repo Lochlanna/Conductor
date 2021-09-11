@@ -1,4 +1,3 @@
-#![warn(unused_extern_crates)]
 use log::LevelFilter;
 use rocket::fairing::AdHoc;
 use simple_logger::SimpleLogger;
