@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use postgres::{types::ToSql, Row};
+use rocket::http::Status;
 use rocket::serde::{json::Json, msgpack::MsgPack, Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -16,6 +17,13 @@ macro_rules! logErrorWithJson {
     }};
 }
 
+macro_rules! LogErrorAndGetEmitResult {
+    ($errorCode:expr, $($args:tt)+) => {{
+        log::error!($($args)*);
+        Err($errorCode)
+    }};
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 enum DataTypes {
     Int,
@@ -25,20 +33,6 @@ enum DataTypes {
     Binary,
     Bool,
     Double,
-}
-
-impl DataTypes {
-    fn to_quest_type(&self) -> &str {
-        match self {
-            DataTypes::Int => "long",
-            DataTypes::Float => "float",
-            DataTypes::Time => "timestamp",
-            DataTypes::Binary => "binary",
-            DataTypes::String => "string",
-            DataTypes::Bool => "boolean",
-            DataTypes::Double => "double",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -55,11 +49,17 @@ enum ProducerErrorCode {
     InvalidData = 9,
 }
 
-macro_rules! LogErrorAndGetEmitResult {
-    ($errorCode:expr, $($args:tt)+) => {{
-        log::error!($($args)*);
-        Err($errorCode)
-    }};
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Producer {
+    name: String,
+    uuid: String,
+    schema: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RegistrationResult {
+    error: u8,
+    uuid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -70,9 +70,144 @@ pub struct Registration {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RegistrationResult {
+pub struct Emit {
+    uuid: String,
+    timestamp: Option<u64>,
+    data: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmitResult {
     error: u8,
-    uuid: Option<String>,
+}
+
+async fn get_producer_row(
+    db: &db::QuestDbConn,
+    uuid: &String,
+) -> Result<Producer, ProducerErrorCode> {
+    if uuid.is_empty() {
+        return LogErrorAndGetEmitResult!(
+            ProducerErrorCode::InvalidUuid,
+            "Incoming request had an empty uuid"
+        );
+    }
+    if uuid.is_empty() {
+        return LogErrorAndGetEmitResult!(
+            ProducerErrorCode::NoMembers,
+            "Incoming request had no data with uuid {}",
+            &uuid
+        );
+    }
+    //check if the uuid is in the db
+    let uuid_copy = uuid.clone();
+    let get_producer_row = move |conn: &mut postgres::Client| {
+        conn.query("SELECT * FROM producers WHERE uuid = $1;", &[&uuid_copy])
+    };
+    let rows: Vec<Row> = match db.run(get_producer_row).await {
+        Ok(rows) => rows,
+        Err(error) => {
+            return LogErrorAndGetEmitResult!(
+                ProducerErrorCode::Unregistered,
+                "Error getting producer from database {}",
+                error
+            );
+        }
+    };
+    if rows.is_empty() {
+        return LogErrorAndGetEmitResult!(
+            ProducerErrorCode::Unregistered,
+            "Error getting producer. No rows returned for uuid: {}",
+            &uuid
+        );
+    }
+    if rows.len() > 1 {
+        //this shouldn't happen...
+        return LogErrorAndGetEmitResult!(
+            ProducerErrorCode::InternalError,
+            "There were multiple entries for uuid: {}",
+            &uuid
+        );
+    }
+    if let Some(row) = rows.get(0) {
+        let producer = Producer {
+            name: row.try_get("name").unwrap_or_default(),
+            uuid: row.try_get("uuid").unwrap_or_default(),
+            schema: row.try_get("schema").unwrap_or_default(),
+        };
+        let default_string = String::default();
+        if producer.name == default_string
+            || producer.uuid == default_string
+            || producer.schema == default_string
+        {
+            return LogErrorAndGetEmitResult!(
+                ProducerErrorCode::InternalError,
+                "Couldn't deserialize row into struct for uuid: {}",
+                &uuid
+            );
+        }
+        Ok(producer)
+    } else {
+        //this should be impossible as we have checked that it's not empty
+        LogErrorAndGetEmitResult!(
+            ProducerErrorCode::InternalError,
+            "Couldn't get the row from the row list for uuid: {}",
+            &uuid
+        )
+    }
+}
+
+fn validate_emit_schema(data: &Emit, producer: &Producer) -> bool {
+    if let Ok(schema) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&producer.schema)
+    {
+        if schema == data.data {
+            return true;
+        }
+    }
+    false
+}
+
+async fn register(db: &db::QuestDbConn, data: &Registration) -> RegistrationResult {
+    let error_code = data.valid();
+    if error_code != ProducerErrorCode::NoError {
+        return RegistrationResult {
+            error: error_code as u8,
+            uuid: None,
+        };
+    }
+
+    match data.persist(db).await {
+        Ok(uuid) => RegistrationResult {
+            error: error_code as u8,
+            uuid: Some(uuid),
+        },
+        Err(err) => RegistrationResult {
+            error: err as u8,
+            uuid: None,
+        },
+    }
+}
+
+async fn emit(db: &db::QuestDbConn, data: &Emit) -> EmitResult {
+    let producer = match get_producer_row(db, &data.uuid).await {
+        Ok(producer) => producer,
+        Err(error_code) => {
+            return EmitResult {
+                error: error_code as u8,
+            }
+        }
+    };
+    if validate_emit_schema(data, &producer) {
+        return EmitResult {
+            error: ProducerErrorCode::InvalidColumnNames as u8,
+        };
+    }
+    // we know the schema is good, the uuid is good. The emit is good. Lets do this thing
+    match data.persist(db).await {
+        Ok(_) => EmitResult {
+            error: ProducerErrorCode::NoError as u8,
+        },
+        Err(err) => EmitResult { error: err as u8 },
+    }
 }
 
 impl Registration {
@@ -188,34 +323,6 @@ impl Registration {
             }
         }
     }
-}
-
-async fn register(db: &db::QuestDbConn, data: &Registration) -> RegistrationResult {
-    let error_code = data.valid();
-    if error_code != ProducerErrorCode::NoError {
-        return RegistrationResult {
-            error: error_code as u8,
-            uuid: None,
-        };
-    }
-
-    match data.persist(db).await {
-        Ok(uuid) => RegistrationResult {
-            error: error_code as u8,
-            uuid: Some(uuid),
-        },
-        Err(err) => RegistrationResult {
-            error: err as u8,
-            uuid: None,
-        },
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Emit {
-    uuid: String,
-    timestamp: Option<u64>,
-    data: HashMap<String, serde_json::Value>,
 }
 
 impl Emit {
@@ -374,123 +481,17 @@ impl Emit {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EmitResult {
-    error: u8,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct Producer {
-    name: String,
-    uuid: String,
-    schema: String,
-}
-
-async fn get_producer_row(
-    db: &db::QuestDbConn,
-    uuid: &String,
-) -> Result<Producer, ProducerErrorCode> {
-    if uuid.is_empty() {
-        return LogErrorAndGetEmitResult!(
-            ProducerErrorCode::InvalidUuid,
-            "Incoming request had an empty uuid"
-        );
-    }
-    if uuid.is_empty() {
-        return LogErrorAndGetEmitResult!(
-            ProducerErrorCode::NoMembers,
-            "Incoming request had no data with uuid {}",
-            &uuid
-        );
-    }
-    //check if the uuid is in the db
-    let uuid_copy = uuid.clone();
-    let get_producer_row = move |conn: &mut postgres::Client| {
-        conn.query("SELECT * FROM producers WHERE uuid = $1;", &[&uuid_copy])
-    };
-    let rows: Vec<Row> = match db.run(get_producer_row).await {
-        Ok(rows) => rows,
-        Err(error) => {
-            return LogErrorAndGetEmitResult!(
-                ProducerErrorCode::Unregistered,
-                "Error getting producer from database {}",
-                error
-            );
+impl DataTypes {
+    fn to_quest_type(&self) -> &str {
+        match self {
+            DataTypes::Int => "long",
+            DataTypes::Float => "float",
+            DataTypes::Time => "timestamp",
+            DataTypes::Binary => "binary",
+            DataTypes::String => "string",
+            DataTypes::Bool => "boolean",
+            DataTypes::Double => "double",
         }
-    };
-    if rows.is_empty() {
-        return LogErrorAndGetEmitResult!(
-            ProducerErrorCode::Unregistered,
-            "Error getting producer. No rows returned for uuid: {}",
-            &uuid
-        );
-    }
-    if rows.len() > 1 {
-        //this shouldn't happen...
-        return LogErrorAndGetEmitResult!(
-            ProducerErrorCode::InternalError,
-            "There were multiple entries for uuid: {}",
-            &uuid
-        );
-    }
-    if let Some(row) = rows.get(0) {
-        let producer = Producer {
-            name: row.try_get("name").unwrap_or_default(),
-            uuid: row.try_get("uuid").unwrap_or_default(),
-            schema: row.try_get("schema").unwrap_or_default(),
-        };
-        let default_string = String::default();
-        if producer.name == default_string
-            || producer.uuid == default_string
-            || producer.schema == default_string
-        {
-            return LogErrorAndGetEmitResult!(
-                ProducerErrorCode::InternalError,
-                "Couldn't deserialize row into struct for uuid: {}",
-                &uuid
-            );
-        }
-        Ok(producer)
-    } else {
-        //this should be impossible as we have checked that it's not empty
-        LogErrorAndGetEmitResult!(
-            ProducerErrorCode::InternalError,
-            "Couldn't get the row from the row list for uuid: {}",
-            &uuid
-        )
-    }
-}
-
-fn validate_emit_schema(data: &Emit, producer: &Producer) -> bool {
-    if let Ok(schema) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&producer.schema)
-    {
-        if schema == data.data {
-            return true;
-        }
-    }
-    false
-}
-
-async fn emit(db: &db::QuestDbConn, data: &Emit) -> EmitResult {
-    let producer = match get_producer_row(db, &data.uuid).await {
-        Ok(producer) => producer,
-        Err(error_code) => {
-            return EmitResult {
-                error: error_code as u8,
-            }
-        }
-    };
-    if validate_emit_schema(data, &producer) {
-        return EmitResult {
-            error: ProducerErrorCode::InvalidColumnNames as u8,
-        };
-    }
-    // we know the schema is good, the uuid is good. The emit is good. Lets do this thing
-
-    data.persist(db).await;
-
-    EmitResult {
-        error: ProducerErrorCode::NoError as u8,
     }
 }
 
@@ -518,4 +519,12 @@ pub async fn emit_pack(conn: db::QuestDbConn, data: MsgPack<Emit>) -> MsgPack<Em
 #[post("/producer/emit", format = "json", data = "<data>")]
 pub async fn emit_json(conn: db::QuestDbConn, data: Json<Emit>) -> Json<EmitResult> {
     Json(emit(&conn, &data).await)
+}
+
+#[get("/producer/check?<uuid>", format = "json")]
+pub async fn check(conn: db::QuestDbConn, uuid: &str) -> Status {
+    match get_producer_row(&conn, &uuid.to_string()).await {
+        Ok(_) => Status::Ok,
+        Err(_) => Status::NotFound,
+    }
 }

@@ -1,3 +1,4 @@
+#![warn(unused_extern_crates)]
 use log::LevelFilter;
 use rocket::fairing::AdHoc;
 use simple_logger::SimpleLogger;
@@ -20,7 +21,8 @@ fn rocket() -> _ {
                 producer::register_json,
                 producer::register_pack,
                 producer::emit_json,
-                producer::emit_pack
+                producer::emit_pack,
+                producer::check
             ],
         )
         .attach(db::QuestDbConn::fairing())
