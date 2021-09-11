@@ -21,8 +21,11 @@ rocket_sync_db_pools = { git = "https://github.com/Lochlanna/Rocket.git", branch
     "postgres_pool",
 ] }
 postgres = { version = "0.19.*", features = [
-    "with-time-0_2",
+    "with-chrono-0_4",
     "with-uuid-0_8",
     "with-serde_json-1",
 ] }
 tokio = { version = "1", features = ["full"] }
+serde_postgres = "0.2.*"
+chrono = {version = "0.4.*", features = ["serde"]}
+config = "0.11"

@@ -16,7 +16,12 @@ fn rocket() -> _ {
     rocket::build()
         .mount(
             "/",
-            routes![producer::register_json, producer::register_pack],
+            routes![
+                producer::register_json,
+                producer::register_pack,
+                producer::emit_json,
+                producer::emit_pack
+            ],
         )
         .attach(db::QuestDbConn::fairing())
         .attach(AdHoc::on_ignite(
