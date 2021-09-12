@@ -1,4 +1,4 @@
-pub mod producer {
+pub mod producer_structs {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
@@ -108,27 +108,21 @@ pub mod producer {
     }
 
     #[derive(Debug, Clone, Deserialize, Serialize)]
-    pub struct Producer {
-        pub name: String,
-        pub uuid: String,
-        pub schema: String,
-    }
-
-    #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct RegistrationResult {
         pub error: u8,
         pub uuid: Option<String>,
     }
 
-    pub struct Schema(HashMap<String, DataTypes>);
+    pub type Schema = HashMap<String, DataTypes>;
+
     #[derive(Debug, Clone, Deserialize, Serialize)]
     pub struct Registration {
         pub name: String,
-        pub schema: HashMap<String, DataTypes>,
+        pub schema: Schema,
         pub use_custom_id: Option<String>, // this is to support devices without persistant storage such as an arduino. They can have a custom id
     }
 
-    pub fn get_schema_as_json_str(schema: &HashMap<String, DataTypes>) -> String {
+    pub fn get_schema_as_json_str(schema: &Schema) -> String {
         match serde_json::to_string(schema) {
             Ok(v) => v,
             Err(err) => {
