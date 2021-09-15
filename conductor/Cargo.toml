@@ -27,4 +27,4 @@ postgres = { version = "0.19.*", features = [
 ] }
 tokio = { version = "1", features = ["full"] }
 chrono = {version = "0.4.*", features = ["serde"]}
-conductor-shared = { path = "../conductor-shared" }
+conductor_shared = { path = "../conductor_shared" }

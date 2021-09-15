@@ -1,5 +1,5 @@
 [package]
-name = "conductor-shared"
+name = "conductor_shared"
 version = "0.1.0"
 edition = "2018"
 

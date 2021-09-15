@@ -141,7 +141,7 @@ name = "conductor"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "conductor-shared",
+ "conductor_shared",
  "log",
  "postgres",
  "rmp-serde",
@@ -155,7 +155,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "conductor-shared"
+name = "conductor_shared"
 version = "0.1.0"
 dependencies = [
  "chrono",

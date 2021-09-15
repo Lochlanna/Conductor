@@ -2,5 +2,5 @@
 
 members = [
     "conductor",
-    "conductor-shared",
+    "conductor_shared",
 ]
