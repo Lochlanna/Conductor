@@ -1,29 +1,6 @@
-[package]
-name = "conductor"
-version = "0.1.0"
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-serde = { version = "1.0.*", features = ["derive"] }
-rmp-serde = "0.15.*"
-serde_json = "1.0.0"
-log = "0.4.*"
-simple_logger = "1.13.*"
-rocket = { git = "https://github.com/Lochlanna/Rocket.git", branch = "msgpack_named", features = [
-    "json",
-    "msgpack",
-    "uuid",
-] }
-uuid = { version = "0.8.*", features = ["serde", "v4"] }
-rocket_sync_db_pools = { git = "https://github.com/Lochlanna/Rocket.git", branch = "msgpack_named", features = [
-    "postgres_pool",
-] }
-postgres = { version = "0.19.*", features = [
-    "with-chrono-0_4",
-    "with-uuid-0_8",
-    "with-serde_json-1",
-] }
-tokio = { version = "1", features = ["full"] }
-chrono = {version = "0.4.*", features = ["serde"]}
+members = [
+    "conductor",
+    "conductor-shared",
+]
