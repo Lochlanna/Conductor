@@ -174,7 +174,7 @@ async fn get_producer_row(
 fn validate_emit_schema(data: &con_shared::Emit, producer: &Producer) -> bool {
     if let Ok(schema) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&producer.schema)
     {
-        if schema == data.data {
+        if schema == *data.get_data() {
             return true;
         }
     }
@@ -203,7 +203,7 @@ async fn register(db: &db::QuestDbConn, registration: &con_shared::Registration)
 }
 
 async fn emit(db: &db::QuestDbConn, data: &con_shared::Emit) -> con_shared::EmitResult {
-    let producer = match get_producer_row(db, &data.uuid).await {
+    let producer = match get_producer_row(db, data.get_uuid()).await {
         Ok(producer) => producer,
         Err(error_code) => {
             return con_shared::EmitResult {
@@ -233,7 +233,7 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
         );
         return con_shared::ProducerErrorCode::NameInvalid;
     }
-    if let Some(custom_id) = &registration.use_custom_id {
+    if let Some(custom_id) = &registration.get_custom_id() {
         if custom_id.is_empty() || custom_id.contains('.') || custom_id.contains('\"') {
             logErrorWithJson!(
                 registration,
@@ -280,8 +280,8 @@ fn generate_table_sql(registration: &con_shared::Registration, table_name: &str)
 
 #[inline]
 fn get_or_create_uuid_for_registration(registration: &con_shared::Registration) -> String {
-    match &registration.use_custom_id {
-        Some(custom_id) => custom_id.clone(),
+    match &registration.get_custom_id() {
+        Some(custom_id) => custom_id.to_string(),
         None => Uuid::new_v4().to_string(),
     }
 }
@@ -292,7 +292,7 @@ fn get_or_create_uuid_for_registration(registration: &con_shared::Registration) 
 fn generate_data_for_creation(registration: &con_shared::Registration, uuid: &str) -> (String, String, String, String) {
     (
         generate_table_sql(registration, uuid),
-        registration.name.clone(),
+        registration.get_name().to_string(),
         serde_json::to_string_pretty(&registration.schema).unwrap_or_default(),
         uuid.to_string(),
     )
@@ -344,19 +344,19 @@ fn get_insert_sql(emit: &con_shared::Emit, column_names: &[&String]) -> Result<S
     }
     Ok(format!(
         "INSERT INTO \"{}\" ({}) VALUES ({});",
-        &emit.uuid, columns, values_str
+        emit.get_uuid(), columns, values_str
     ))
 }
 
 
 async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(), con_shared::ProducerErrorCode> {
-    let schema_json = match get_producer_row(db, &emit.uuid).await {
+    let schema_json = match get_producer_row(db, emit.get_uuid()).await {
         Ok(p) => p.schema,
         Err(ec) => {
             return LogErrorAndGetEmitResult!(
                 ec,
                 "Error persisting producer emit to db. Couldn't get producer  for uuid: {}",
-                &emit.uuid
+                emit.get_uuid()
             )
         }
     };
@@ -364,19 +364,19 @@ async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(
         return LogErrorAndGetEmitResult!(
             con_shared::ProducerErrorCode::NoMembers,
             "Error persisting producer emit to db. Empty registered schema for uuid: {}",
-            &emit.uuid
+            emit.get_uuid()
         );
     }
     let schema: con_shared::Schema;
     match serde_json::from_str(schema_json.as_str()) {
         Ok(s) => schema = s,
-        Err(err) => return LogErrorAndGetEmitResult!(con_shared::ProducerErrorCode::NoMembers, "Error persisting producer emit to db. Empty registered schema for uuid: {} with error: {}", &emit.uuid, err),
+        Err(err) => return LogErrorAndGetEmitResult!(con_shared::ProducerErrorCode::NoMembers, "Error persisting producer emit to db. Empty registered schema for uuid: {} with error: {}", emit.get_uuid(), err),
     };
 
     //pull out keys and values to garantee order!
     let mut columns = Vec::new();
     let mut params_store: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
-    for (key, val) in &emit.data {
+    for (key, val) in emit.get_data() {
         columns.push(key);
         let data_type;
         if let Some(dt) = schema.get(key) {
