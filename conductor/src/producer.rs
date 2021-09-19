@@ -226,7 +226,7 @@ async fn emit(db: &db::QuestDbConn, data: &con_shared::Emit) -> con_shared::Emit
 }
 
 fn validate_registration(registration: &con_shared::Registration) -> con_shared::ProducerErrorCode {
-    if registration.name.is_empty() {
+    if registration.get_name().is_empty() {
         logErrorWithJson!(
             registration,
             "Producer registration failed. Producer name is empty."
@@ -242,26 +242,26 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
             return con_shared::ProducerErrorCode::InvalidUuid;
         }
     }
-    if registration.schema.contains_key("ts") {
+    if registration.contains_column("ts") {
         logErrorWithJson!(
             registration,
             "Producer registration failed. column with name ts. This is a resereved name."
         );
         return con_shared::ProducerErrorCode::TimestampDefined;
     }
-    if registration.schema.is_empty() {
+    if registration.get_schema().is_empty() {
         logErrorWithJson!(registration, "Producer registration failed. No columns in schema.");
         return con_shared::ProducerErrorCode::NoMembers;
     }
-    for col in registration.schema.keys() {
+    for col in registration.get_schema().keys() {
         if col.contains('.') || col.contains('\"') {
             logErrorWithJson!(registration, "Producer registration failed. Column with name {} is invalid as it contains a '.' or a '\"'.", col);
             return con_shared::ProducerErrorCode::InvalidColumnNames;
         }
     }
-    if registration.schema.len() > 2147483647 {
+    if registration.schema_len() > 2147483647 {
         //I mean this is invalid. But seriously how did we get here
-        logErrorWithJson!(registration, "Producer schema registration had {} columns which is more than the maximum quest can support of 2,147,483,647.", registration.schema.len());
+        logErrorWithJson!(registration, "Producer schema registration had {} columns which is more than the maximum quest can support of 2,147,483,647.", registration.schema_len());
         return con_shared::ProducerErrorCode::TooManyColumns;
     }
 
@@ -271,7 +271,7 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
 fn generate_table_sql(registration: &con_shared::Registration, table_name: &str) -> String {
     //     CREATE TABLE my_table(symb SYMBOL, price DOUBLE, ts TIMESTAMP, s STRING) timestamp(ts);
     let mut sql = format! {"CREATE TABLE IF NOT EXISTS \"{}\" (ts TIMESTAMP", table_name};
-    for (col_name, col_type) in &registration.schema {
+    for (col_name, col_type) in registration.get_schema() {
         sql = sql + ", \"" + col_name + "\" " + col_type.to_quest_type_str();
     }
     sql += ") timestamp(ts);";
@@ -293,7 +293,7 @@ fn generate_data_for_creation(registration: &con_shared::Registration, uuid: &st
     (
         generate_table_sql(registration, uuid),
         registration.get_name().to_string(),
-        serde_json::to_string_pretty(&registration.schema).unwrap_or_default(),
+        serde_json::to_string_pretty(registration.get_schema()).unwrap_or_default(),
         uuid.to_string(),
     )
 }

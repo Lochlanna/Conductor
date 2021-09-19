@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum DataTypes {
@@ -49,17 +48,17 @@ pub struct RegistrationResult {
     pub uuid: Option<String>,
 }
 
-pub type Schema = HashMap<&'_ str, DataTypes>;
+pub type Schema = HashMap<String, DataTypes>;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Registration {
-    name: &'_ str,
+    name: String,
     schema: Schema,
-    use_custom_id: Option<&'_ str>, // this is to support devices without persistent storage such as an arduino. They can have a custom id
+    use_custom_id: Option<String>, // this is to support devices without persistent storage such as an arduino. They can have a custom id
 }
 
 impl Registration {
-    pub fn new(name: &str, schema: Schema, custom_id: Option<&str>) -> Registration {
+    pub fn new(name: String, schema: Schema, custom_id: Option<String>) -> Registration {
         Registration {
             name,
             schema,
@@ -67,7 +66,7 @@ impl Registration {
         }
     }
 
-    pub fn new_empty(name: &str) -> Registration {
+    pub fn new_empty(name: String) -> Registration {
         Registration {
             name,
             schema: Default::default(),
@@ -75,35 +74,43 @@ impl Registration {
         }
     }
 
-    pub fn get_name(&self) -> &str {
-        self.name
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 
-    pub fn set_name(&mut self, name: &str) {
-        self.name.clone_from(&name);
+    pub fn set_name(&mut self, name: &String) {
+        self.name.clone_from(name);
     }
 
-    pub fn set_custom_id(&mut self, id: &str) {
+    pub fn set_custom_id(&mut self, id: String) {
         self.use_custom_id = Some(id);
     }
 
     pub fn has_custom_id(&self) -> bool {
         self.use_custom_id.is_some()
     }
-    pub fn get_custom_id(&self) -> &Option<&str> {
+    pub fn get_custom_id(&self) -> &Option<String> {
         &self.use_custom_id
     }
 
-    pub fn add_column(&mut self, column_name: &str, data_type: DataTypes) -> bool {
+    pub fn add_column(&mut self, column_name: String, data_type: DataTypes) -> bool {
         self.schema.insert(column_name, data_type).is_some()
     }
 
-    pub fn remove_column(&mut self, column_name: &str) -> bool {
+    pub fn remove_column(&mut self, column_name: &String) -> bool {
         self.schema.remove(column_name).is_some()
     }
 
     pub fn contains_column(&self, column_name: &str) -> bool {
         self.schema.contains_key(column_name)
+    }
+
+    pub fn schema_len(&self) -> usize {
+        self.schema.len()
+    }
+
+    pub fn get_schema(&self) -> &Schema {
+        &self.schema
     }
 }
 
