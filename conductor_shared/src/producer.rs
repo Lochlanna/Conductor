@@ -177,3 +177,74 @@ impl Emit {
 pub struct EmitResult {
     pub error: u8,
 }
+
+
+pub struct SchemaBuilder {
+    schema: Schema
+}
+
+impl SchemaBuilder {
+    pub fn new() -> SchemaBuilder {
+        SchemaBuilder {
+            schema: Default::default()
+        }
+    }
+
+    //noinspection RsSelfConvention
+    pub fn with_capacity(n:usize) -> SchemaBuilder {
+        SchemaBuilder {
+            schema: HashMap::with_capacity(n)
+        }
+    }
+
+    pub fn add_column(mut self, name: String, col_type: DataTypes) -> Self {
+        self.schema.insert(name, col_type);
+        self
+    }
+
+    pub fn add_int(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::Int);
+        self
+    }
+    pub fn add_float(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::Float);
+        self
+    }
+    pub fn add_time(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::Time);
+        self
+    }
+    pub fn add_binary(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::Binary);
+        self
+    }
+    pub fn add_string(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::String);
+        self
+    }
+    pub fn add_bool(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::Bool);
+        self
+    }
+    pub fn add_double(mut self, name: String) -> Self {
+        self.schema.insert(name,DataTypes::Double);
+        self
+    }
+
+    pub fn build(self) -> Schema {
+        self.schema
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SchemaBuilder;
+    use crate::producer;
+    #[test]
+    fn it_works() {
+        let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
+        let value = schema.get("hello").expect("expected value wasn't in the schema");
+        assert!(matches!(value, producer::DataTypes::Binary));
+        assert_eq!(schema.contains_key("hello"), true);
+    }
+}
