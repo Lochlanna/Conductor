@@ -3,4 +3,5 @@
 members = [
     "conductor",
     "conductor_shared",
+    "producer"
 ]

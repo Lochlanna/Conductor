@@ -1,0 +1,20 @@
+[package]
+name = "conductor_producer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+conductor_shared = { path = "../conductor_shared" }
+reqwest = { version = "0.11", features = ["rustls-tls", "blocking"]}
+tokio = { version = "1", features = ["full"], optional = true }
+
+[features]
+default = []
+async = ["tokio"]
+msgpack = []
+json = ["reqwest/json"]
+
+[profile.test]
+default = ["async", "msgpack","json"]
