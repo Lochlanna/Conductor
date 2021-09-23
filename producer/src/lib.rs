@@ -1,22 +1,53 @@
 
 mod blocking {
-    use std::collections::HashMap;
-    use conductor_shared::producer;
+    // use proc_macro::TokenStream;
+    // use quote::quote;
+    // use syn;
 
+    // fn impl_hello_macro(ast: &syn::DeriveInput) -> TokenStream {
+    //     let name = &ast.ident;
+    //     let gen = quote! {
+    //         impl HelloMacro for #name {
+    //             fn hello_macro() {
+    //                 println!("Hello, Macro! My name is {}!", stringify!(#name));
+    //             }
+    //         }
+    //     };
+    //     gen.into()
+    // }
+    //
+    // #[proc_macro_derive(Producer)]
+    // pub fn derive_producer(_item: TokenStream) -> TokenStream {
+    //     // Construct a representation of Rust code as a syntax tree
+    //     // that we can manipulate
+    //     let ast = syn::parse(input).unwrap();
+    //     println!("The inside of the derived producer is {:?}", ast);
+    //     impl_hello_macro(&ast)
+    // }
+    //
+    //
+    // #[derive(Debug, Producer)]
+    pub struct MyCoolDataStructure {
+        name: String,
+        id: usize
+    }
 
+    impl MyCoolDataStructure {
+        pub fn new() -> MyCoolDataStructure {
+            MyCoolDataStructure {
+                name: "hello".to_string(),
+                id: 0
+            }
+        }
+    }
 
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::blocking::SchemaBuilder;
-    use conductor_shared::producer;
     use super::blocking;
     #[test]
-    fn it_works() {
-        let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
-        let value = schema.get("hello").expect("expected value wasn't in the schema");
-        assert!(matches!(value, producer::DataTypes::Binary));
-        assert_eq!(schema.contains_key("hello"), true);
+    fn basic_producer_test() {
+        let x = blocking::MyCoolDataStructure::new();
     }
 }

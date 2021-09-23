@@ -74,7 +74,7 @@ impl Registration {
         }
     }
 
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -89,8 +89,11 @@ impl Registration {
     pub fn has_custom_id(&self) -> bool {
         self.use_custom_id.is_some()
     }
-    pub fn get_custom_id(&self) -> &Option<String> {
-        &self.use_custom_id
+    pub fn get_custom_id(&self) -> Option<&str> {
+        if let Some(c_id) = &self.use_custom_id {
+            return Some(c_id.as_str());
+        }
+        None
     }
 
     pub fn add_column(&mut self, column_name: String, data_type: DataTypes) -> bool {
