@@ -1,0 +1,13 @@
+[package]
+name = "conductor_derive"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {version = "1.0", features = ["extra-traits"]}
+conductor_shared = { path = "../conductor_shared" }
+quote = "1.0"
+url = "2.2.2"
