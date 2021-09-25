@@ -1,7 +1,7 @@
 [package]
 name = "conductor_derive"
 version = "0.1.0"
-edition = "2021"
+edition = "2018"
 
 [lib]
 proc-macro = true
@@ -10,4 +10,5 @@ proc-macro = true
 syn = {version = "1.0", features = ["extra-traits"]}
 conductor_shared = { path = "../conductor_shared" }
 quote = "1.0"
-url = "2.2.2"
+
+proc-macro2 = "1.0"

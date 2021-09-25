@@ -11,6 +11,7 @@ conductor_derive = { path = "../conductor_derive" }
 reqwest = { version = "0.11", features = ["rustls-tls", "blocking"]}
 tokio = { version = "1", features = ["full"], optional = true }
 
+
 [features]
 default = []
 async = ["tokio"]

@@ -165,9 +165,9 @@ name = "conductor_derive"
 version = "0.1.0"
 dependencies = [
  "conductor_shared",
+ "proc-macro2",
  "quote",
  "syn",
- "url",
 ]
 
 [[package]]
@@ -187,6 +187,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use url::Url;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum DataTypes {
@@ -236,6 +237,68 @@ impl SchemaBuilder {
 
     pub fn build(self) -> Schema {
         self.schema
+    }
+}
+
+
+struct ConductorConfig {
+    url: Url
+}
+
+trait ProducerVariables {
+    fn set_uuid(&mut self, uuid: String);
+    fn get_uuid(&self) -> Result<&str, &'static str>;
+    fn get_conductor_config(&self) -> &ConductorConfig;
+}
+
+pub trait Producer {
+    fn emit(&self)-> Result<(), &'static str>
+    {
+        Err("")
+    }
+    //Generate the schema for this struct and register it with conductor
+    fn register(&mut self)-> Result<String, &'static str>
+    {
+        Err("")
+    }
+    fn is_registered(&self) -> Result<bool, &'static str>
+    {
+        Err("")
+    }
+    fn get_schema(&self) -> HashMap<String,DataTypes>;
+}
+
+pub trait ToProducerData {
+    fn to_producer_data(&self) -> DataTypes;
+}
+
+impl ToProducerData for usize {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::Int
+    }
+}
+
+impl ToProducerData for String {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::String
+    }
+}
+
+impl ToProducerData for str {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::String
+    }
+}
+
+impl ToProducerData for f64 {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::Double
+    }
+}
+
+impl ToProducerData for f32 {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::Float
     }
 }
 
