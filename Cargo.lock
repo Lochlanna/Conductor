@@ -161,9 +161,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "conductor_derive"
+version = "0.1.0"
+dependencies = [
+ "conductor_shared",
+ "quote",
+ "syn",
+ "url",
+]
+
+[[package]]
 name = "conductor_producer"
 version = "0.1.0"
 dependencies = [
+ "conductor_derive",
  "conductor_shared",
  "reqwest",
  "tokio",

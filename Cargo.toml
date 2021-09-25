@@ -3,5 +3,6 @@
 members = [
     "conductor",
     "conductor_shared",
-    "producer"
+    "producer",
+    "conductor_derive"
 ]

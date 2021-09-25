@@ -7,6 +7,7 @@ edition = "2018"
 
 [dependencies]
 conductor_shared = { path = "../conductor_shared" }
+conductor_derive = { path = "../conductor_derive" }
 reqwest = { version = "0.11", features = ["rustls-tls", "blocking"]}
 tokio = { version = "1", features = ["full"], optional = true }
 
