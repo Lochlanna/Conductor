@@ -1,34 +1,44 @@
 extern crate proc_macro;
-use proc_macro::{TokenStream, Ident};
+use proc_macro::{TokenStream};
 use quote::quote;
 use syn;
-use syn::{parse_macro_input, DeriveInput, Item, Fields, Type, Data, DataStruct, FieldsNamed, Field};
+use syn::{DeriveInput, Fields, Data, Attribute};
+use syn::spanned::Spanned;
 
-#[proc_macro_derive(Producer)]
+#[proc_macro_derive(Producer, attributes(producer_skip_field))]
 pub fn derive_producer(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
     // that we can manipulate
 
     let item:DeriveInput = syn::parse(input).unwrap();
 
-    let struct_name = item.ident;
+    let struct_name = &item.ident;
 
-    let struct_data = if let Data::Struct(struct_body) = item.data {
+    let struct_data = if let Data::Struct(struct_body) = &item.data {
         struct_body
     } else {
-        //TODO error
-        return TokenStream::new();
+        return syn::Error::new(item.span() ,"Producer derive macro only works on structs").to_compile_error().into();
     };
 
-    let fields = if let Fields::Named(named_fields) = struct_data.fields {
+    let fields = if let Fields::Named(named_fields) = &struct_data.fields {
         named_fields
     } else {
-        //TODO error
-        return TokenStream::new();
+        return syn::Error::new(item.span(), "Named fields are missing").to_compile_error().into();
     };
     let mut fields_vec = Vec::new();
-    for field in fields.named {
-        fields_vec.push(field.ident.unwrap());
+    for field in &fields.named {
+        let mut skip = false;
+        for attr in &field.attrs {
+            if attr.path.is_ident("producer_skip_field") {
+                skip = true;
+                break;
+            }
+        }
+        if skip {
+            continue;
+        }
+
+        fields_vec.push(field.ident.as_ref().unwrap());
     }
     let tokens = quote! {
         impl conductor_shared::producer::Producer for #struct_name {
@@ -41,6 +51,5 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
             }
         }
     };
-    println!("Tokens {}", tokens);
     tokens.into()
 }

@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::Url;
+use duplicate::duplicate;
+use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum DataTypes {
     Int,
     Float,
@@ -241,17 +243,17 @@ impl SchemaBuilder {
 }
 
 
-struct ConductorConfig {
+pub struct ConductorConfig {
     url: Url
 }
 
-trait ProducerVariables {
+pub trait ProducerVariables {
     fn set_uuid(&mut self, uuid: String);
     fn get_uuid(&self) -> Result<&str, &'static str>;
     fn get_conductor_config(&self) -> &ConductorConfig;
 }
 
-pub trait Producer {
+pub trait Producer: ProducerVariables{
     fn emit(&self)-> Result<(), &'static str>
     {
         Err("")
@@ -272,45 +274,74 @@ pub trait ToProducerData {
     fn to_producer_data(&self) -> DataTypes;
 }
 
-impl ToProducerData for usize {
+#[duplicate(
+int_type;
+[ u8 ]; [ u16 ]; [ u32 ];
+[ i8 ]; [ i16 ]; [ i32 ]; [ i64 ];
+)]
+impl ToProducerData for int_type {
     fn to_producer_data(&self) -> DataTypes {
         DataTypes::Int
     }
 }
 
-impl ToProducerData for String {
+#[duplicate(
+string_type;
+[ String ]; [ str ];
+)]
+impl ToProducerData for string_type {
     fn to_producer_data(&self) -> DataTypes {
         DataTypes::String
     }
 }
 
-impl ToProducerData for str {
-    fn to_producer_data(&self) -> DataTypes {
-        DataTypes::String
-    }
-}
-
-impl ToProducerData for f64 {
+#[duplicate(
+float_type;
+[ f32 ]; [ f64 ];
+)]
+impl ToProducerData for float_type {
     fn to_producer_data(&self) -> DataTypes {
         DataTypes::Double
     }
 }
 
-impl ToProducerData for f32 {
+impl ToProducerData for [u8] {
     fn to_producer_data(&self) -> DataTypes {
-        DataTypes::Float
+        DataTypes::Binary
     }
 }
+
+impl ToProducerData for bool {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::Bool
+    }
+}
+
+#[duplicate(
+time_type;
+[ NaiveDate ]; [ NaiveDateTime ];
+[ DateTime<Utc> ];
+)]
+impl ToProducerData for time_type {
+    fn to_producer_data(&self) -> DataTypes {
+        DataTypes::Time
+    }
+}
+
+
 
 #[cfg(test)]
 mod tests {
     use super::SchemaBuilder;
     use crate::producer;
+
+
     #[test]
-    fn it_works() {
+    fn schema_builder() {
         let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
         let value = schema.get("hello").expect("expected value wasn't in the schema");
         assert!(matches!(value, producer::DataTypes::Binary));
         assert_eq!(schema.contains_key("hello"), true);
     }
+
 }
