@@ -12,3 +12,7 @@ conductor_shared = { path = "../conductor_shared" }
 quote = "1.0"
 
 proc-macro2 = "1.0"
+
+[features]
+default = []
+async = []

@@ -1,8 +1,8 @@
 mod tests {
     use std::collections::HashMap;
-    use conductor_shared::producer::{ConductorConfig, ToProducerData, Producer, DataTypes};
+    use conductor::producer::{ConductorConfig, ToProducerData, Producer, DataTypes};
 
-    #[derive(Debug, conductor_derive::Producer)]
+    #[derive(Debug, conductor::Producer)]
     struct TestDerive {
         id: u32,
         name: String,

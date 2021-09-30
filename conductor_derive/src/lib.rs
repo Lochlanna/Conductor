@@ -1,29 +1,25 @@
 extern crate proc_macro;
 use proc_macro::{TokenStream};
+use proc_macro2::Ident;
 use quote::quote;
 use syn;
-use syn::{DeriveInput, Fields, Data, Attribute};
+use syn::{DeriveInput, Fields, Data, Attribute, Type};
 use syn::spanned::Spanned;
+use quote::TokenStreamExt;
 
-#[proc_macro_derive(Producer, attributes(producer_skip_field))]
-pub fn derive_producer(input: TokenStream) -> TokenStream {
-    // Construct a representation of Rust code as a syntax tree
-    // that we can manipulate
-
-    let item:DeriveInput = syn::parse(input).unwrap();
-
+fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Type> , &syn::Ident), TokenStream> {
     let struct_name = &item.ident;
 
     let struct_data = if let Data::Struct(struct_body) = &item.data {
         struct_body
     } else {
-        return syn::Error::new(item.span() ,"Producer derive macro only works on structs").to_compile_error().into();
+        return Err(syn::Error::new(item.span() ,"Producer derive macro only works on structs").to_compile_error().into());
     };
 
     let fields = if let Fields::Named(named_fields) = &struct_data.fields {
         named_fields
     } else {
-        return syn::Error::new(item.span(), "Named fields are missing").to_compile_error().into();
+        return Err(syn::Error::new(item.span(), "Named fields are missing").to_compile_error().into());
     };
     let mut fields_vec = Vec::new();
     let mut fields_type_vec = Vec::new();
@@ -42,17 +38,43 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
         fields_type_vec.push(&field.ty);
         fields_vec.push(field.ident.as_ref().unwrap());
     }
-    let tokens = quote! {
-        impl conductor_shared::producer::Producer for #struct_name {
-            fn get_schema() ->  std::collections::HashMap<std::string::String,conductor_shared::producer::DataTypes> {
+    Ok((fields_vec, fields_type_vec, struct_name))
+}
+
+#[proc_macro_derive(Producer, attributes(producer_skip_field))]
+pub fn derive_producer(input: TokenStream) -> TokenStream {
+    // Construct a representation of Rust code as a syntax tree
+    // that we can manipulate
+
+    let item:DeriveInput = syn::parse(input).unwrap();
+
+    let (fields_vec, fields_type_vec, struct_name)  = match get_fields_types(&item) {
+        Ok(sd) => sd,
+        Err(err) => return err
+    };
+
+    let bodyTokens = quote! {
+        {
+            fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::producer::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
                 #(
-                    schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_type_vec::to_producer_data());
+                    schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_type_vec::conductor_data_type());
                 )*
                 schema
             }
         }
     };
-    // println!("Tokens {}", tokens);
+    let mut tokens = quote! {
+        impl conductor::producer::Producer for #struct_name
+    };
+    tokens.append_all(bodyTokens.clone());
+    #[cfg(feature = "async")]
+    {
+        tokens.append_all(quote! {
+            impl conductor::producer::AsyncProducer for #struct_name
+        });
+        tokens.append_all(bodyTokens);
+    }
+    println!("Tokens {}", tokens);
     tokens.into()
 }

@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use url::Url;
 use duplicate::duplicate;
 use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
+#[cfg(feature = "async")]
+use async_trait::async_trait;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum DataTypes {
@@ -31,14 +33,14 @@ impl DataTypes {
 }
 
 
-
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum ProducerErrorCode {
     NoError = 0,
     TimestampDefined = 1,
     NoMembers = 2,
     InvalidColumnNames = 3,
-    TooManyColumns = 4, // who is doing this???
+    TooManyColumns = 4,
+    // who is doing this???
     InternalError = 5,
     InvalidUuid = 6,
     NameInvalid = 7,
@@ -66,7 +68,7 @@ impl Registration {
         Registration {
             name,
             schema,
-            use_custom_id: custom_id
+            use_custom_id: custom_id,
         }
     }
 
@@ -74,7 +76,7 @@ impl Registration {
         Registration {
             name,
             schema: Default::default(),
-            use_custom_id: None
+            use_custom_id: None,
         }
     }
 
@@ -129,18 +131,18 @@ pub struct Emit {
 }
 
 impl Emit {
-    pub fn new(uuid:String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Emit {
+    pub fn new(uuid: String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Emit {
         Emit {
             uuid,
             timestamp,
-            data
+            data,
         }
     }
-    pub fn new_empty(uuid:String, timestamp: Option<u64>) -> Emit {
+    pub fn new_empty(uuid: String, timestamp: Option<u64>) -> Emit {
         Emit {
             uuid,
             timestamp,
-            data: Default::default()
+            data: Default::default(),
         }
     }
 
@@ -187,7 +189,7 @@ pub struct EmitResult {
 
 
 pub struct SchemaBuilder {
-    schema: Schema
+    schema: Schema,
 }
 
 impl SchemaBuilder {
@@ -198,7 +200,7 @@ impl SchemaBuilder {
     }
 
     //noinspection RsSelfConvention
-    pub fn with_capacity(n:usize) -> SchemaBuilder {
+    pub fn with_capacity(n: usize) -> SchemaBuilder {
         SchemaBuilder {
             schema: HashMap::with_capacity(n)
         }
@@ -210,31 +212,31 @@ impl SchemaBuilder {
     }
 
     pub fn add_int(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::Int);
+        self.schema.insert(name, DataTypes::Int);
         self
     }
     pub fn add_float(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::Float);
+        self.schema.insert(name, DataTypes::Float);
         self
     }
     pub fn add_time(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::Time);
+        self.schema.insert(name, DataTypes::Time);
         self
     }
     pub fn add_binary(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::Binary);
+        self.schema.insert(name, DataTypes::Binary);
         self
     }
     pub fn add_string(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::String);
+        self.schema.insert(name, DataTypes::String);
         self
     }
     pub fn add_bool(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::Bool);
+        self.schema.insert(name, DataTypes::Bool);
         self
     }
     pub fn add_double(mut self, name: String) -> Self {
-        self.schema.insert(name,DataTypes::Double);
+        self.schema.insert(name, DataTypes::Double);
         self
     }
 
@@ -245,29 +247,48 @@ impl SchemaBuilder {
 
 
 pub struct ConductorConfig {
-    url: Url
+    url: Url,
 }
 
-
-pub trait Producer{
-    fn emit(&self, uuid: &str, conductor_url:&Url)-> Result<(), &'static str>
+#[cfg(feature = "async")]
+#[async_trait]
+pub trait AsyncProducer {
+    async fn emit_raw(uuid: &str, conductor_url: &Url, data: &[u8]) -> Result<(), &'static str>
     {
         Err("")
     }
     //Generate the schema for this struct and register it with conductor
-    fn register(name: &str, uuid: &str, conductor_url:&Url)-> Result<String, &'static str>
+    async fn register(name: &str, uuid: &str, conductor_url: &Url) -> Result<String, &'static str>
     {
         Err("")
     }
-    fn is_registered(uuid: &str, conductor_url:&Url) -> Result<bool, &'static str>
+    async fn is_registered(uuid: &str, conductor_url: &Url) -> Result<bool, &'static str>
     {
         Err("")
     }
-    fn get_schema() -> HashMap<String,DataTypes>;
+    fn generate_schema() -> HashMap<String, DataTypes>;
+}
+
+
+pub trait Producer {
+    fn emit_raw(uuid: &str, conductor_url: &Url, data: &[u8]) -> Result<(), &'static str>
+    {
+        Err("")
+    }
+    //Generate the schema for this struct and register it with conductor
+    fn register(name: &str, uuid: &str, conductor_url: &Url) -> Result<String, &'static str>
+    {
+        Err("")
+    }
+    fn is_registered(uuid: &str, conductor_url: &Url) -> Result<bool, &'static str>
+    {
+        Err("")
+    }
+    fn generate_schema() -> HashMap<String, DataTypes>;
 }
 
 pub trait ToProducerData {
-    fn to_producer_data() -> DataTypes;
+    fn conductor_data_type() -> DataTypes;
 }
 
 #[duplicate(
@@ -276,7 +297,7 @@ int_type;
 [ i8 ]; [ i16 ]; [ i32 ]; [ i64 ];
 )]
 impl ToProducerData for int_type {
-    fn to_producer_data() -> DataTypes {
+    fn conductor_data_type() -> DataTypes {
         DataTypes::Int
     }
 }
@@ -286,7 +307,7 @@ string_type;
 [ String ]; [ str ];
 )]
 impl ToProducerData for string_type {
-    fn to_producer_data() -> DataTypes {
+    fn conductor_data_type() -> DataTypes {
         DataTypes::String
     }
 }
@@ -296,19 +317,19 @@ float_type;
 [ f32 ]; [ f64 ];
 )]
 impl ToProducerData for float_type {
-    fn to_producer_data() -> DataTypes {
+    fn conductor_data_type() -> DataTypes {
         DataTypes::Double
     }
 }
 
 impl ToProducerData for [u8] {
-    fn to_producer_data() -> DataTypes {
+    fn conductor_data_type() -> DataTypes {
         DataTypes::Binary
     }
 }
 
 impl ToProducerData for bool {
-    fn to_producer_data() -> DataTypes {
+    fn conductor_data_type() -> DataTypes {
         DataTypes::Bool
     }
 }
@@ -316,14 +337,13 @@ impl ToProducerData for bool {
 #[duplicate(
 time_type;
 [ NaiveDate ]; [ NaiveDateTime ];
-[ DateTime<Utc> ];
+[ DateTime < Utc > ];
 )]
 impl ToProducerData for time_type {
-    fn to_producer_data() -> DataTypes {
+    fn conductor_data_type() -> DataTypes {
         DataTypes::Time
     }
 }
-
 
 
 #[cfg(test)]
@@ -339,5 +359,4 @@ mod tests {
         assert!(matches!(value, producer::DataTypes::Binary));
         assert_eq!(schema.contains_key("hello"), true);
     }
-
 }

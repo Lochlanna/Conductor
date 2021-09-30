@@ -2,6 +2,7 @@
 
 members = [
     "conductor",
+    "conductor_app",
     "conductor_shared",
     "conductor_derive",
     "conductor_tests"

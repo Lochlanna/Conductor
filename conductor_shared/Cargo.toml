@@ -14,11 +14,12 @@ duplicate = "0.3.0"
 
 reqwest = { version = "0.11", features = ["blocking"] }
 tokio = { version = "1", features = ["full"], optional = true }
+async-trait = {version = "0.1.51", optional = true}
 rmp-serde = { version = "0.15.*", optional = true }
 
 [features]
 default = []
-async = ["tokio"]
+async = ["tokio", "async-trait"]
 msgpack = ["rmp-serde"]
 json = ["reqwest/json"]
 
