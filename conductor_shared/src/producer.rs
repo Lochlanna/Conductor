@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use url::Url;
 use duplicate::duplicate;
 use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
-use serde_json::value::Value::Array;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum DataTypes {
@@ -278,9 +277,7 @@ pub trait ToProducerData {
 #[duplicate(
 int_type;
 [ u8 ]; [ u16 ]; [ u32 ];
-[ Option<u8> ]; [ Option<u16> ]; [ Option<u32> ];
 [ i8 ]; [ i16 ]; [ i32 ]; [ i64 ];
-[ Option<i8> ]; [ Option<i16> ]; [ Option<i32> ]; [ Option<i64> ];
 )]
 impl ToProducerData for int_type {
     fn to_producer_data(&self) -> DataTypes {
@@ -291,7 +288,6 @@ impl ToProducerData for int_type {
 #[duplicate(
 string_type;
 [ String ]; [ str ];
-[ Option<String> ];
 )]
 impl ToProducerData for string_type {
     fn to_producer_data(&self) -> DataTypes {
@@ -302,7 +298,6 @@ impl ToProducerData for string_type {
 #[duplicate(
 float_type;
 [ f32 ]; [ f64 ];
-[ Option<f32> ]; [ Option<f64> ];
 )]
 impl ToProducerData for float_type {
     fn to_producer_data(&self) -> DataTypes {
@@ -310,23 +305,13 @@ impl ToProducerData for float_type {
     }
 }
 
-#[duplicate(
-binary_type;
-[ [u8]  ];
-[ Option<Vec<u8>> ];
-)]
-impl ToProducerData for binary_type {
+impl ToProducerData for [u8] {
     fn to_producer_data(&self) -> DataTypes {
         DataTypes::Binary
     }
 }
 
-#[duplicate(
-bool_type;
-[ bool ];
-[ Option<bool> ];
-)]
-impl ToProducerData for bool_type {
+impl ToProducerData for bool {
     fn to_producer_data(&self) -> DataTypes {
         DataTypes::Bool
     }
@@ -334,8 +319,8 @@ impl ToProducerData for bool_type {
 
 #[duplicate(
 time_type;
-[ NaiveDate ]; [ NaiveDateTime ]; [ DateTime<Utc> ];
-[ Option<NaiveDate> ]; [ Option<NaiveDateTime> ]; [ Option<DateTime<Utc>> ];
+[ NaiveDate ]; [ NaiveDateTime ];
+[ DateTime<Utc> ];
 )]
 impl ToProducerData for time_type {
     fn to_producer_data(&self) -> DataTypes {
