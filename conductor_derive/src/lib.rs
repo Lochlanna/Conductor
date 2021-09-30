@@ -26,6 +26,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
         return syn::Error::new(item.span(), "Named fields are missing").to_compile_error().into();
     };
     let mut fields_vec = Vec::new();
+    let mut fields_type_vec = Vec::new();
     for field in &fields.named {
         let mut skip = false;
         for attr in &field.attrs {
@@ -38,19 +39,20 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
             continue;
         }
 
-        fields_vec.push(&field.ty);
+        fields_type_vec.push(&field.ty);
+        fields_vec.push(field.ident.as_ref().unwrap());
     }
     let tokens = quote! {
         impl conductor_shared::producer::Producer for #struct_name {
             fn get_schema() ->  std::collections::HashMap<std::string::String,conductor_shared::producer::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
                 #(
-                    schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_vec::to_producer_data());
+                    schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_type_vec::to_producer_data());
                 )*
                 schema
             }
         }
     };
-    println!("Tokens {}", tokens);
+    // println!("Tokens {}", tokens);
     tokens.into()
 }
