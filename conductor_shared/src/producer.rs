@@ -1,3 +1,4 @@
+use std::any::Any;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::Url;
@@ -247,31 +248,26 @@ pub struct ConductorConfig {
     url: Url
 }
 
-pub trait ProducerVariables {
-    fn set_uuid(&mut self, uuid: String);
-    fn get_uuid(&self) -> Result<&str, &'static str>;
-    fn get_conductor_config(&self) -> &ConductorConfig;
-}
 
-pub trait Producer: ProducerVariables{
-    fn emit(&self)-> Result<(), &'static str>
+pub trait Producer{
+    fn emit(&self, uuid: &str, conductor_url:&Url)-> Result<(), &'static str>
     {
         Err("")
     }
     //Generate the schema for this struct and register it with conductor
-    fn register(&mut self)-> Result<String, &'static str>
+    fn register(name: &str, uuid: &str, conductor_url:&Url)-> Result<String, &'static str>
     {
         Err("")
     }
-    fn is_registered(&self) -> Result<bool, &'static str>
+    fn is_registered(uuid: &str, conductor_url:&Url) -> Result<bool, &'static str>
     {
         Err("")
     }
-    fn get_schema(&self) -> HashMap<String,DataTypes>;
+    fn get_schema() -> HashMap<String,DataTypes>;
 }
 
 pub trait ToProducerData {
-    fn to_producer_data(&self) -> DataTypes;
+    fn to_producer_data() -> DataTypes;
 }
 
 #[duplicate(
@@ -280,7 +276,7 @@ int_type;
 [ i8 ]; [ i16 ]; [ i32 ]; [ i64 ];
 )]
 impl ToProducerData for int_type {
-    fn to_producer_data(&self) -> DataTypes {
+    fn to_producer_data() -> DataTypes {
         DataTypes::Int
     }
 }
@@ -290,7 +286,7 @@ string_type;
 [ String ]; [ str ];
 )]
 impl ToProducerData for string_type {
-    fn to_producer_data(&self) -> DataTypes {
+    fn to_producer_data() -> DataTypes {
         DataTypes::String
     }
 }
@@ -300,19 +296,19 @@ float_type;
 [ f32 ]; [ f64 ];
 )]
 impl ToProducerData for float_type {
-    fn to_producer_data(&self) -> DataTypes {
+    fn to_producer_data() -> DataTypes {
         DataTypes::Double
     }
 }
 
 impl ToProducerData for [u8] {
-    fn to_producer_data(&self) -> DataTypes {
+    fn to_producer_data() -> DataTypes {
         DataTypes::Binary
     }
 }
 
 impl ToProducerData for bool {
-    fn to_producer_data(&self) -> DataTypes {
+    fn to_producer_data() -> DataTypes {
         DataTypes::Bool
     }
 }
@@ -323,7 +319,7 @@ time_type;
 [ DateTime<Utc> ];
 )]
 impl ToProducerData for time_type {
-    fn to_producer_data(&self) -> DataTypes {
+    fn to_producer_data() -> DataTypes {
         DataTypes::Time
     }
 }

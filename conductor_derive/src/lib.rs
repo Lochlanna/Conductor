@@ -38,18 +38,19 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
             continue;
         }
 
-        fields_vec.push(field.ident.as_ref().unwrap());
+        fields_vec.push(&field.ty);
     }
     let tokens = quote! {
         impl conductor_shared::producer::Producer for #struct_name {
-            fn get_schema(&self) ->  std::collections::HashMap<std::string::String,conductor_shared::producer::DataTypes> {
+            fn get_schema() ->  std::collections::HashMap<std::string::String,conductor_shared::producer::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
                 #(
-                    schema.insert(std::string::String::from(stringify!(#fields_vec)), self.#fields_vec.to_producer_data());
+                    schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_vec::to_producer_data());
                 )*
                 schema
             }
         }
     };
+    println!("Tokens {}", tokens);
     tokens.into()
 }

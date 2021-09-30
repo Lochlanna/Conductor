@@ -9,19 +9,6 @@ mod tests {
         #[producer_skip_field]
         _uuid: String
     }
-    impl conductor_shared::producer::ProducerVariables for TestDerive {
-        fn set_uuid(&mut self, uuid: String) {
-            todo!()
-        }
-
-        fn get_uuid(&self) -> Result<&str, &'static str> {
-            todo!()
-        }
-
-        fn get_conductor_config(&self) -> &ConductorConfig {
-            todo!()
-        }
-    }
     #[test]
     fn producer_derive() {
         let test = TestDerive {
