@@ -19,7 +19,7 @@ pub enum DataTypes {
 }
 
 impl DataTypes {
-    #[must_use] pub fn to_quest_type_str(&self) -> &str {
+    #[must_use] pub const fn to_quest_type_str(&self) -> &str {
         match self {
             DataTypes::Int => "long",
             DataTypes::Float => "float",
@@ -34,7 +34,7 @@ impl DataTypes {
 
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
-pub enum ProducerErrorCode {
+pub enum ErrorCode {
     NoError = 0,
     TimestampDefined = 1,
     NoMembers = 2,
@@ -64,7 +64,7 @@ pub struct Registration {
 }
 
 impl Registration {
-    #[must_use] pub fn new(name: String, schema: Schema, custom_id: Option<String>) -> Self {
+    #[must_use] pub const fn new(name: String, schema: Schema, custom_id: Option<String>) -> Self {
         Self {
             name,
             schema,
@@ -92,7 +92,7 @@ impl Registration {
         self.use_custom_id = Some(id);
     }
 
-    #[must_use] pub fn has_custom_id(&self) -> bool {
+    #[must_use] pub const fn has_custom_id(&self) -> bool {
         self.use_custom_id.is_some()
     }
     #[must_use] pub fn get_custom_id(&self) -> Option<&str> {
@@ -118,7 +118,7 @@ impl Registration {
         self.schema.len()
     }
 
-    #[must_use] pub fn get_schema(&self) -> &Schema {
+    #[must_use] pub const fn get_schema(&self) -> &Schema {
         &self.schema
     }
 }
@@ -131,7 +131,7 @@ pub struct Emit {
 }
 
 impl Emit {
-    #[must_use] pub fn new(uuid: String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Self {
+    #[must_use] pub const fn new(uuid: String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Self {
         Self {
             uuid,
             timestamp,
@@ -142,19 +142,19 @@ impl Emit {
         Self {
             uuid,
             timestamp,
-            data: Default::default(),
+            data: std::collections::HashMap::default(),
         }
     }
 
-    #[must_use] pub fn get_uuid(&self) -> &String {
+    #[must_use] pub const fn get_uuid(&self) -> &String {
         &self.uuid
     }
 
-    #[must_use] pub fn get_timestamp(&self) -> Option<u64> {
+    #[must_use] pub const fn get_timestamp(&self) -> Option<u64> {
         self.timestamp
     }
 
-    #[must_use] pub fn get_data(&self) -> &HashMap<String, serde_json::Value> {
+    #[must_use] pub const fn get_data(&self) -> &HashMap<String, serde_json::Value> {
         &self.data
     }
 
@@ -198,7 +198,7 @@ impl Default for SchemaBuilder {
 impl SchemaBuilder {
     #[must_use] pub fn new() -> Self {
         Self {
-            schema: Default::default()
+            schema: std::collections::HashMap::default()
         }
     }
 
@@ -243,6 +243,7 @@ impl SchemaBuilder {
         self
     }
 
+    #[allow(clippy::missing_const_for_fn)]
     #[must_use] pub fn build(self) -> Schema {
         self.schema
     }
@@ -251,6 +252,7 @@ impl SchemaBuilder {
 
 #[cfg(feature = "async")]
 #[async_trait]
+#[allow(clippy::module_name_repetitions)]
 pub trait AsyncProducer {
     async fn emit_raw(uuid: &str, conductor_url: &Url, data: &[u8]) -> Result<(), &'static str>
     {
@@ -356,6 +358,6 @@ mod tests {
         let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
         let value = schema.get("hello").expect("expected value wasn't in the schema");
         assert!(matches!(value, producer::DataTypes::Binary));
-        assert_eq!(schema.contains_key("hello"), true);
+        assert!(schema.contains_key("hello"));
     }
 }
