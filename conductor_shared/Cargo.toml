@@ -22,6 +22,3 @@ default = []
 async = ["tokio", "async-trait"]
 msgpack = ["rmp-serde"]
 json = ["reqwest/json"]
-
-[profile.test]
-default = ["async", "msgpack", "json"]

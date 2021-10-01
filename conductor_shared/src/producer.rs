@@ -1,4 +1,4 @@
-use std::any::Any;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::Url;
@@ -65,27 +65,27 @@ pub struct Registration {
 
 impl Registration {
     pub fn new(name: String, schema: Schema, custom_id: Option<String>) -> Registration {
-        Registration {
+        Self {
             name,
             schema,
             use_custom_id: custom_id,
         }
     }
 
-    pub fn new_empty(name: String) -> Registration {
-        Registration {
+    #[must_use] pub fn new_empty(name: String) -> Self {
+        Self {
             name,
-            schema: Default::default(),
+            schema: std::collections::HashMap::default(),
             use_custom_id: None,
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    #[must_use] pub fn get_name(&self) -> &str {
         &self.name
     }
 
-    pub fn set_name(&mut self, name: &String) {
-        self.name.clone_from(name);
+    pub fn set_name(&mut self, name: &str) {
+        self.name = String::from(name);
     }
 
     pub fn set_custom_id(&mut self, id: String) {
@@ -106,7 +106,7 @@ impl Registration {
         self.schema.insert(column_name, data_type).is_some()
     }
 
-    pub fn remove_column(&mut self, column_name: &String) -> bool {
+    pub fn remove_column(&mut self, column_name: &str) -> bool {
         self.schema.remove(column_name).is_some()
     }
 
@@ -158,22 +158,19 @@ impl Emit {
         &self.data
     }
 
-    pub fn column_in_data(&self, column_name: &String) -> bool {
+    pub fn column_in_data(&self, column_name: &str) -> bool {
         self.data.contains_key(column_name)
     }
 
-    pub fn get_value_for_column(&self, column_name: &String) -> Option<&serde_json::Value> {
+    pub fn get_value_for_column(&self, column_name: &str) -> Option<&serde_json::Value> {
         self.data.get(column_name)
     }
 
     pub fn insert_or_overwrite_column(&mut self, column_name: String, value: serde_json::Value) -> bool {
-        match self.data.insert(column_name, value) {
-            None => false,
-            Some(_) => true
-        }
+        self.data.insert(column_name, value).is_some()
     }
 
-    pub fn remove_column(&mut self, column_name: &String) -> Option<serde_json::Value> {
+    pub fn remove_column(&mut self, column_name: &str) -> Option<serde_json::Value> {
         self.data.remove(column_name)
     }
 
@@ -190,6 +187,12 @@ pub struct EmitResult {
 
 pub struct SchemaBuilder {
     schema: Schema,
+}
+
+impl Default for SchemaBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SchemaBuilder {
@@ -267,16 +270,16 @@ pub trait AsyncProducer {
 
 
 pub trait Producer {
-    fn emit_raw(uuid: &str, conductor_url: &Url, data: &[u8]) -> Result<(), &'static str>
+    fn emit_raw(_uuid: &str, _conductor_url: &Url, _data: &[u8]) -> Result<(), &'static str>
     {
         Err("")
     }
     //Generate the schema for this struct and register it with conductor
-    fn register(name: &str, uuid: &str, conductor_url: &Url) -> Result<String, &'static str>
+    fn register(_name: &str, _uuid: &str, _conductor_url: &Url) -> Result<String, &'static str>
     {
         Err("")
     }
-    fn is_registered(uuid: &str, conductor_url: &Url) -> Result<bool, &'static str>
+    fn is_registered(_uuid: &str, _conductor_url: &Url) -> Result<bool, &'static str>
     {
         Err("")
     }

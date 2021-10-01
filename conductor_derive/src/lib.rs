@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::{TokenStream};
 use quote::quote;
-use syn;
+
 use syn::{DeriveInput, Fields, Data};
 use syn::spanned::Spanned;
 use quote::TokenStreamExt;
@@ -66,7 +66,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
     let mut tokens = quote! {
         impl conductor::producer::Producer for #struct_name
     };
-    tokens.append_all(body_tokens.clone());
+    tokens.append_all(body_tokens);
     #[cfg(feature = "async")]
     {
         tokens.append_all(quote! {

@@ -32,7 +32,7 @@ pub struct Producer {
 
 pub fn to_solid_type_from_json(
     val: &serde_json::Value,
-    data_type: &con_shared::DataTypes,
+    data_type: con_shared::DataTypes,
 ) -> Result<Box<dyn postgres::types::ToSql + Sync + Send>, String> {
     match data_type {
         con_shared::DataTypes::Int => match val.as_i64() {
@@ -49,7 +49,7 @@ pub fn to_solid_type_from_json(
                     use epsilon to make extra sure that this is an okay thing to do.
                     There could be a time when a valid f32 value is rejected due to the epsilon difference but if your data
                     is that close use a double type...*/
-                    if v > (f32::MAX as f64) - (f32::EPSILON as f64) || v < (f32::MIN as f64) + (f32::EPSILON as f64) {
+                    if v > f64::from(f32::MAX) - f64::from(f32::EPSILON) || v < f64::from(f32::MIN) + f64::from(f32::EPSILON) {
                         return Err(format!("Not possible to convert json value to f32 (too big to fit). Value: {:?}", val));
                     }
                     // It should be safe to cast this to an f32. It fits
@@ -260,7 +260,7 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
             return con_shared::ProducerErrorCode::InvalidColumnNames;
         }
     }
-    if registration.schema_len() > 2147483647 {
+    if registration.schema_len() > 2_147_483_647 {
         //I mean this is invalid. But seriously how did we get here
         log_error_with_json!(registration, "Producer schema registration had {} columns which is more than the maximum quest can support of 2,147,483,647.", registration.schema_len());
         return con_shared::ProducerErrorCode::TooManyColumns;
@@ -271,7 +271,7 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
 
 fn generate_create_table_sql(registration: &con_shared::Registration, table_name: &str) -> String {
     //     CREATE TABLE my_table(symb SYMBOL, price DOUBLE, ts TIMESTAMP, s STRING) timestamp(ts);
-    let mut sql = format! {"CREATE TABLE IF NOT EXISTS \"{}\" (ts TIMESTAMP", table_name};
+    let mut sql = format! ("CREATE TABLE IF NOT EXISTS \"{}\" (ts TIMESTAMP", table_name);
     for (col_name, col_type) in registration.get_schema() {
         sql = sql + ", \"" + col_name + "\" " + col_type.to_quest_type_str();
     }
@@ -282,7 +282,7 @@ fn generate_create_table_sql(registration: &con_shared::Registration, table_name
 #[inline]
 fn get_or_create_uuid_for_registration(registration: &con_shared::Registration) -> String {
     match &registration.get_custom_id() {
-        Some(custom_id) => custom_id.to_string(),
+        Some(custom_id) => (*custom_id).to_string(),
         None => Uuid::new_v4().to_string(),
     }
 }
@@ -390,7 +390,7 @@ async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(
             );
         }
 
-        match to_solid_type_from_json(val, data_type) {
+        match to_solid_type_from_json(val, *data_type) {
             Ok(param) => params_store.push(param),
             Err(err) => {
                 return log_error_and_get_emit_result!(
