@@ -427,7 +427,7 @@ async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(
 }
 
 
-#[post("/producer/register", format = "msgpack", data = "<data>")]
+#[post("/v1/producer/register", format = "msgpack", data = "<data>")]
 pub async fn register_pack(
     conn: db::QuestDbConn,
     data: MsgPack<con_shared::Registration>,
@@ -435,7 +435,7 @@ pub async fn register_pack(
     MsgPack(register(&conn, &data).await)
 }
 
-#[post("/producer/register", format = "json", data = "<data>")]
+#[post("/v1/producer/register", format = "json", data = "<data>")]
 pub async fn register_json(
     conn: db::QuestDbConn,
     data: Json<con_shared::Registration>,
@@ -443,17 +443,17 @@ pub async fn register_json(
     Json(register(&conn, &data).await)
 }
 
-#[post("/producer/emit", format = "msgpack", data = "<data>")]
+#[post("/v1/producer/emit", format = "msgpack", data = "<data>")]
 pub async fn emit_pack(conn: db::QuestDbConn, data: MsgPack<con_shared::Emit>) -> MsgPack<con_shared::EmitResult> {
     MsgPack(emit(&conn, &data).await)
 }
 
-#[post("/producer/emit", format = "json", data = "<data>")]
+#[post("/v1/producer/emit", format = "json", data = "<data>")]
 pub async fn emit_json(conn: db::QuestDbConn, data: Json<con_shared::Emit>) -> Json<con_shared::EmitResult> {
     Json(emit(&conn, &data).await)
 }
 
-#[get("/producer/check?<uuid>", format = "json")]
+#[get("/v1/producer/check?<uuid>", format = "json")]
 pub async fn check(conn: db::QuestDbConn, uuid: &str) -> Status {
     match get_producer_row(&conn, &uuid.to_string()).await {
         Ok(_) => Status::Ok,

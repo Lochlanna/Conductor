@@ -254,16 +254,16 @@ impl SchemaBuilder {
 #[async_trait]
 #[allow(clippy::module_name_repetitions)]
 pub trait AsyncProducer {
-    async fn emit_raw(uuid: &str, conductor_url: &Url, data: &[u8]) -> Result<(), &'static str>
+    async fn emit_raw(uuid: &str, conductor_url: Url, data: &[u8]) -> Result<(), &'static str>
     {
         Err("")
     }
     //Generate the schema for this struct and register it with conductor
-    async fn register(name: &str, uuid: &str, conductor_url: &Url) -> Result<String, &'static str>
+    async fn register(name: &str, uuid: Option<String>, conductor_url: Url) -> Result<String, &'static str>
     {
         Err("")
     }
-    async fn is_registered(uuid: &str, conductor_url: &Url) -> Result<bool, &'static str>
+    async fn is_registered(uuid: &str, conductor_url: Url) -> Result<bool, &'static str>
     {
         Err("")
     }
@@ -272,16 +272,57 @@ pub trait AsyncProducer {
 
 
 pub trait Producer {
-    fn emit_raw(_uuid: &str, _conductor_url: &Url, _data: &[u8]) -> Result<(), &'static str>
+    fn emit_raw(_uuid: &str, _conductor_url: Url, _data: &[u8]) -> Result<(), &'static str>
     {
         Err("")
     }
+    ///
+    /// TODO
+    /// # Arguments
+    ///
+    /// * `name`:
+    /// * `uuid`:
+    /// * `conductor_url`:
+    ///
+    /// returns: Result<String, &str>
+    /// # Errors
+    /// TODO
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     //Generate the schema for this struct and register it with conductor
-    fn register(_name: &str, _uuid: &str, _conductor_url: &Url) -> Result<String, &'static str>
+    fn register(name: &str, uuid: Option<String>, conductor_url: Url) -> Result<String, &'static str>
     {
-        Err("")
+        //TODO handle errors correctly
+        let reg = Registration {
+            name: name.to_string(),
+            schema: Self::generate_schema(),
+            use_custom_id: uuid
+        };
+        let client = reqwest::blocking::Client::new();
+        let request = {
+            let msg_pack = match rmp_serde::to_vec_named(&reg){
+                Ok(m) => m,
+                Err(_) => return Err("there was an error serializing the registration struct")
+            };
+            client.post(conductor_url)
+                .body(msg_pack)
+                .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack")).send()
+        };
+        let response = match request {
+            Ok(r) => r,
+            Err(_) => return Err("There was an error sending the registration")
+        };
+        let result:RegistrationResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
+            Ok(r) => r,
+            Err(_) => return Err("Couldn't deserialize the registration response")
+        };
+        Ok(result.uuid.unwrap())
     }
-    fn is_registered(_uuid: &str, _conductor_url: &Url) -> Result<bool, &'static str>
+
+    fn is_registered(_uuid: &str, _conductor_url: Url) -> Result<bool, &'static str>
     {
         Err("")
     }

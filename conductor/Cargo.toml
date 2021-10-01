@@ -13,5 +13,3 @@ conductor_derive = { path = "../conductor_derive" }
 [features]
 default = []
 async = ["conductor_shared/async", "conductor_derive/async"]
-msgpack = ["conductor_shared/msgpack"]
-json = ["conductor_shared/json"]
