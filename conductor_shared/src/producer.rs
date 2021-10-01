@@ -19,7 +19,7 @@ pub enum DataTypes {
 }
 
 impl DataTypes {
-    pub fn to_quest_type_str(&self) -> &str {
+    #[must_use] pub fn to_quest_type_str(&self) -> &str {
         match self {
             DataTypes::Int => "long",
             DataTypes::Float => "float",
@@ -64,7 +64,7 @@ pub struct Registration {
 }
 
 impl Registration {
-    pub fn new(name: String, schema: Schema, custom_id: Option<String>) -> Registration {
+    #[must_use] pub fn new(name: String, schema: Schema, custom_id: Option<String>) -> Self {
         Self {
             name,
             schema,
@@ -92,10 +92,10 @@ impl Registration {
         self.use_custom_id = Some(id);
     }
 
-    pub fn has_custom_id(&self) -> bool {
+    #[must_use] pub fn has_custom_id(&self) -> bool {
         self.use_custom_id.is_some()
     }
-    pub fn get_custom_id(&self) -> Option<&str> {
+    #[must_use] pub fn get_custom_id(&self) -> Option<&str> {
         if let Some(c_id) = &self.use_custom_id {
             return Some(c_id.as_str());
         }
@@ -110,15 +110,15 @@ impl Registration {
         self.schema.remove(column_name).is_some()
     }
 
-    pub fn contains_column(&self, column_name: &str) -> bool {
+    #[must_use] pub fn contains_column(&self, column_name: &str) -> bool {
         self.schema.contains_key(column_name)
     }
 
-    pub fn schema_len(&self) -> usize {
+    #[must_use] pub fn schema_len(&self) -> usize {
         self.schema.len()
     }
 
-    pub fn get_schema(&self) -> &Schema {
+    #[must_use] pub fn get_schema(&self) -> &Schema {
         &self.schema
     }
 }
@@ -131,38 +131,38 @@ pub struct Emit {
 }
 
 impl Emit {
-    pub fn new(uuid: String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Emit {
-        Emit {
+    #[must_use] pub fn new(uuid: String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Self {
+        Self {
             uuid,
             timestamp,
             data,
         }
     }
-    pub fn new_empty(uuid: String, timestamp: Option<u64>) -> Emit {
-        Emit {
+    #[must_use] pub fn new_empty(uuid: String, timestamp: Option<u64>) -> Self {
+        Self {
             uuid,
             timestamp,
             data: Default::default(),
         }
     }
 
-    pub fn get_uuid(&self) -> &String {
+    #[must_use] pub fn get_uuid(&self) -> &String {
         &self.uuid
     }
 
-    pub fn get_timestamp(&self) -> Option<u64> {
+    #[must_use] pub fn get_timestamp(&self) -> Option<u64> {
         self.timestamp
     }
 
-    pub fn get_data(&self) -> &HashMap<String, serde_json::Value> {
+    #[must_use] pub fn get_data(&self) -> &HashMap<String, serde_json::Value> {
         &self.data
     }
 
-    pub fn column_in_data(&self, column_name: &str) -> bool {
+    #[must_use] pub fn column_in_data(&self, column_name: &str) -> bool {
         self.data.contains_key(column_name)
     }
 
-    pub fn get_value_for_column(&self, column_name: &str) -> Option<&serde_json::Value> {
+    #[must_use] pub fn get_value_for_column(&self, column_name: &str) -> Option<&serde_json::Value> {
         self.data.get(column_name)
     }
 
@@ -174,7 +174,7 @@ impl Emit {
         self.data.remove(column_name)
     }
 
-    pub fn get_column_list(&self) -> Vec<&String> {
+    #[must_use] pub fn get_column_list(&self) -> Vec<&String> {
         self.data.keys().collect()
     }
 }
@@ -196,54 +196,54 @@ impl Default for SchemaBuilder {
 }
 
 impl SchemaBuilder {
-    pub fn new() -> SchemaBuilder {
-        SchemaBuilder {
+    #[must_use] pub fn new() -> Self {
+        Self {
             schema: Default::default()
         }
     }
 
     //noinspection RsSelfConvention
-    pub fn with_capacity(n: usize) -> SchemaBuilder {
-        SchemaBuilder {
+    #[must_use] pub fn with_capacity(n: usize) -> Self {
+        Self {
             schema: HashMap::with_capacity(n)
         }
     }
 
-    pub fn add_column(mut self, name: String, col_type: DataTypes) -> Self {
+    #[must_use] pub fn add_column(mut self, name: String, col_type: DataTypes) -> Self {
         self.schema.insert(name, col_type);
         self
     }
 
-    pub fn add_int(mut self, name: String) -> Self {
+    #[must_use] pub fn add_int(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Int);
         self
     }
-    pub fn add_float(mut self, name: String) -> Self {
+    #[must_use] pub fn add_float(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Float);
         self
     }
-    pub fn add_time(mut self, name: String) -> Self {
+    #[must_use] pub fn add_time(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Time);
         self
     }
-    pub fn add_binary(mut self, name: String) -> Self {
+    #[must_use] pub fn add_binary(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Binary);
         self
     }
-    pub fn add_string(mut self, name: String) -> Self {
+    #[must_use] pub fn add_string(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::String);
         self
     }
-    pub fn add_bool(mut self, name: String) -> Self {
+    #[must_use] pub fn add_bool(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Bool);
         self
     }
-    pub fn add_double(mut self, name: String) -> Self {
+    #[must_use] pub fn add_double(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Double);
         self
     }
 
-    pub fn build(self) -> Schema {
+    #[must_use] pub fn build(self) -> Schema {
         self.schema
     }
 }
