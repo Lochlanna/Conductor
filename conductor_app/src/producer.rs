@@ -98,6 +98,7 @@ pub fn to_solid_type_from_json(
 
 async fn get_producer_row(
     db: &db::QuestDbConn,
+    #[allow(clippy::ptr_arg)]
     uuid: &String,
 ) -> Result<Producer, con_shared::ProducerErrorCode> {
     if uuid.is_empty() {

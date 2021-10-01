@@ -1,6 +1,7 @@
+#![allow(dead_code)]
 mod tests {
-    use std::collections::HashMap;
-    use conductor::producer::{ConductorConfig, ToProducerData, Producer, DataTypes};
+    #[allow(unused_imports)]
+    use conductor::producer::{DataTypes, ToProducerData};
 
     #[derive(Debug, conductor::Producer)]
     struct TestDerive {
@@ -16,7 +17,7 @@ mod tests {
             name: "".to_string(),
             _uuid: "".to_string()
         };
-        let schema: HashMap<String, DataTypes> = test.get_schema();
+        let schema = test.get_schema();
         assert!(schema.contains_key("id"));
         assert_eq!(schema["id"], DataTypes::Int);
         assert!(schema.contains_key("name"));

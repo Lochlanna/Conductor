@@ -1,9 +1,8 @@
 extern crate proc_macro;
 use proc_macro::{TokenStream};
-use proc_macro2::Ident;
 use quote::quote;
 use syn;
-use syn::{DeriveInput, Fields, Data, Attribute, Type};
+use syn::{DeriveInput, Fields, Data};
 use syn::spanned::Spanned;
 use quote::TokenStreamExt;
 
@@ -53,7 +52,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
         Err(err) => return err
     };
 
-    let bodyTokens = quote! {
+    let body_tokens = quote! {
         {
             fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::producer::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
@@ -67,13 +66,13 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
     let mut tokens = quote! {
         impl conductor::producer::Producer for #struct_name
     };
-    tokens.append_all(bodyTokens.clone());
+    tokens.append_all(body_tokens.clone());
     #[cfg(feature = "async")]
     {
         tokens.append_all(quote! {
             impl conductor::producer::AsyncProducer for #struct_name
         });
-        tokens.append_all(bodyTokens);
+        tokens.append_all(body_tokens);
     }
     println!("Tokens {}", tokens);
     tokens.into()

@@ -246,10 +246,6 @@ impl SchemaBuilder {
 }
 
 
-pub struct ConductorConfig {
-    url: Url,
-}
-
 #[cfg(feature = "async")]
 #[async_trait]
 pub trait AsyncProducer {
