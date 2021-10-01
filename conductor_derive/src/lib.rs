@@ -40,6 +40,21 @@ fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ty
     Ok((fields_vec, fields_type_vec, struct_name))
 }
 
+///
+///
+/// # Arguments
+///TODO
+/// * `input`:
+///
+/// returns: `TokenStream`
+///
+/// # Panics
+/// TODO
+/// # Examples
+///TODO
+/// ```
+///
+/// ```
 #[proc_macro_derive(Producer, attributes(producer_skip_field))]
 pub fn derive_producer(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
@@ -66,7 +81,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
     let mut tokens = quote! {
         impl conductor::producer::Producer for #struct_name
     };
-    tokens.append_all(body_tokens);
+    tokens.append_all(body_tokens.clone());
     #[cfg(feature = "async")]
     {
         tokens.append_all(quote! {

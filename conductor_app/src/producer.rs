@@ -53,8 +53,9 @@ pub fn to_solid_type_from_json(
                         return Err(format!("Not possible to convert json value to f32 (too big to fit). Value: {:?}", val));
                     }
                     // It should be safe to cast this to an f32. It fits
-                    Ok(Box::new(v as f32))
-                },
+                    #[allow(clippy::cast_possible_truncation)]
+                        Ok(Box::new(v as f32))
+                }
                 None => Err(format!("Not possible to convert json value to f32 (Couldn't get f64 first). Value: {:?}", val)),
             }
         }
@@ -209,7 +210,7 @@ async fn emit(db: &db::QuestDbConn, data: &con_shared::Emit) -> con_shared::Emit
         Err(error_code) => {
             return con_shared::EmitResult {
                 error: error_code as u8,
-            }
+            };
         }
     };
     if validate_emit_schema(data, &producer) {
@@ -271,7 +272,7 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
 
 fn generate_create_table_sql(registration: &con_shared::Registration, table_name: &str) -> String {
     //     CREATE TABLE my_table(symb SYMBOL, price DOUBLE, ts TIMESTAMP, s STRING) timestamp(ts);
-    let mut sql = format! ("CREATE TABLE IF NOT EXISTS \"{}\" (ts TIMESTAMP", table_name);
+    let mut sql = format!("CREATE TABLE IF NOT EXISTS \"{}\" (ts TIMESTAMP", table_name);
     for (col_name, col_type) in registration.get_schema() {
         sql = sql + ", \"" + col_name + "\" " + col_type.to_quest_type_str();
     }
@@ -286,7 +287,6 @@ fn get_or_create_uuid_for_registration(registration: &con_shared::Registration) 
         None => Uuid::new_v4().to_string(),
     }
 }
-
 
 
 #[inline]
@@ -358,7 +358,7 @@ async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(
                 ec,
                 "Error persisting producer emit to db. Couldn't get producer  for uuid: {}",
                 emit.get_uuid()
-            )
+            );
         }
     };
     if schema_json.is_empty() {
@@ -403,7 +403,7 @@ async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(
     }
     let sql = get_insert_sql(emit, &columns).unwrap();
 
-    let _ = db
+    let write_result = db
         .run(move |conn: &mut postgres::Client| {
             //we will do both these in one go so that we don't add it to the producers table unless we were able to create its data table
 
@@ -414,7 +414,16 @@ async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(
             conn.execute(sql.as_str(), params.as_slice())
         })
         .await;
-    Ok(())
+    match write_result {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            log_error_and_get_emit_result!(
+                con_shared::ErrorCode::InternalError,
+                "Error persisting producer emit to db. Couldn't parse data packet. {}",
+                err
+            )
+        }
+    }
 }
 
 

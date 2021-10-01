@@ -10,7 +10,7 @@ pub async fn create_app_schema(rocket: Rocket<Build>) -> Rocket<Build> {
         .await
         .expect("database mounted")
         .run(|conn| {
-            log::info!("Creating produceres table");
+            log::info!("Creating producers table");
             conn.execute(
                 r#"
             CREATE TABLE IF NOT EXISTS producers (name string, uuid string, schema string);"#,
