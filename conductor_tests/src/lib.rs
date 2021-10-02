@@ -2,22 +2,22 @@
 mod tests {
     #[allow(unused_imports)]
     use conductor::producer::{DataTypes, ToProducerData};
-
-    #[derive(Debug, conductor::Producer)]
+    use serde::Serialize;
+    #[derive(Clone, Debug, Serialize, conductor::Producer)]
     struct TestDerive {
         id: u32,
         name: String,
         #[producer_skip_field]
-        _uuid: String
+        uuid: String
     }
     #[test]
     fn producer_derive() {
         let test = TestDerive {
             id: 0,
             name: "".to_string(),
-            _uuid: "".to_string()
+            uuid: "".to_string()
         };
-        let schema = test.get_schema();
+        let schema = test.generate_schema();
         assert!(schema.contains_key("id"));
         assert_eq!(schema["id"], DataTypes::Int);
         assert!(schema.contains_key("name"));

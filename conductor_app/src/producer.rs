@@ -100,7 +100,7 @@ pub fn to_solid_type_from_json(
 async fn get_producer_row(
     db: &db::QuestDbConn,
     #[allow(clippy::ptr_arg)]
-    uuid: &String,
+    uuid: &str,
 ) -> Result<Producer, con_shared::ErrorCode> {
     if uuid.is_empty() {
         return log_error_and_get_emit_result!(
@@ -116,7 +116,7 @@ async fn get_producer_row(
         );
     }
     //check if the uuid is in the db
-    let uuid_copy = uuid.clone();
+    let uuid_copy = uuid.to_string();
     let get_producer_row = move |conn: &mut postgres::Client| {
         conn.query("SELECT * FROM producers WHERE uuid = $1;", &[&uuid_copy])
     };
@@ -173,7 +173,7 @@ async fn get_producer_row(
     }
 }
 
-fn validate_emit_schema(data: &con_shared::Emit, producer: &Producer) -> bool {
+fn validate_emit_schema(data: &con_shared::Emit<'_, HashMap<String,serde_json::Value>>, producer: &Producer) -> bool {
     if let Ok(schema) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&producer.schema)
     {
         if schema == *data.get_data() {
@@ -204,7 +204,7 @@ async fn register(db: &db::QuestDbConn, registration: &con_shared::Registration)
     }
 }
 
-async fn emit(db: &db::QuestDbConn, data: &con_shared::Emit) -> con_shared::EmitResult {
+async fn emit(db: &db::QuestDbConn, data: &con_shared::Emit<'_,HashMap<String,serde_json::Value>>) -> con_shared::EmitResult {
     let producer = match get_producer_row(db, data.get_uuid()).await {
         Ok(producer) => producer,
         Err(error_code) => {
@@ -329,7 +329,7 @@ async fn persist_registration(registration: &con_shared::Registration, db: &db::
     }
 }
 
-fn get_insert_sql(emit: &con_shared::Emit, column_names: &[&String]) -> Result<String, String> {
+fn get_insert_sql(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Value>>, column_names: &[&String]) -> Result<String, String> {
     if column_names.is_empty() {
         return Err("Insert Sql must have at least one colum but there were none".to_string());
     }
@@ -350,7 +350,7 @@ fn get_insert_sql(emit: &con_shared::Emit, column_names: &[&String]) -> Result<S
 }
 
 
-async fn persist_emit(emit: &con_shared::Emit, db: &db::QuestDbConn) -> Result<(), con_shared::ErrorCode> {
+async fn persist_emit(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Value>>, db: &db::QuestDbConn) -> Result<(), con_shared::ErrorCode> {
     let schema_json = match get_producer_row(db, emit.get_uuid()).await {
         Ok(p) => p.schema,
         Err(ec) => {
@@ -444,12 +444,12 @@ pub async fn register_json(
 }
 
 #[post("/v1/producer/emit", format = "msgpack", data = "<data>")]
-pub async fn emit_pack(conn: db::QuestDbConn, data: MsgPack<con_shared::Emit>) -> MsgPack<con_shared::EmitResult> {
+pub async fn emit_pack(conn: db::QuestDbConn, data: MsgPack<con_shared::Emit<'_, HashMap<String,serde_json::Value>>>) -> MsgPack<con_shared::EmitResult> {
     MsgPack(emit(&conn, &data).await)
 }
 
 #[post("/v1/producer/emit", format = "json", data = "<data>")]
-pub async fn emit_json(conn: db::QuestDbConn, data: Json<con_shared::Emit>) -> Json<con_shared::EmitResult> {
+pub async fn emit_json(conn: db::QuestDbConn, data: Json<con_shared::Emit<'_, HashMap<String,serde_json::Value>>>) -> Json<con_shared::EmitResult> {
     Json(emit(&conn, &data).await)
 }
 

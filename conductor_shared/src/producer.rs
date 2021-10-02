@@ -1,11 +1,12 @@
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use url::Url;
+use url::{Url};
 use duplicate::duplicate;
 use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
 #[cfg(feature = "async")]
 use async_trait::async_trait;
+use num_enum::TryFromPrimitive;
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum DataTypes {
@@ -33,20 +34,21 @@ impl DataTypes {
 }
 
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
 pub enum ErrorCode {
     NoError = 0,
     TimestampDefined = 1,
     NoMembers = 2,
     InvalidColumnNames = 3,
     TooManyColumns = 4,
-    // who is doing this???
     InternalError = 5,
     InvalidUuid = 6,
     NameInvalid = 7,
     Unregistered = 8,
     InvalidData = 9,
 }
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegistrationResult {
@@ -124,58 +126,31 @@ impl Registration {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Emit {
-    uuid: String,
+pub struct Emit<'a, T> {
+    uuid: &'a str,
     timestamp: Option<u64>,
-    data: HashMap<String, serde_json::Value>,
+    data: T,
 }
 
-impl Emit {
-    #[must_use] pub const fn new(uuid: String, timestamp: Option<u64>, data: HashMap<String, serde_json::Value>) -> Self {
+impl <'a, T> Emit<'a, T> {
+    #[must_use] pub const fn new(uuid: &'a str, timestamp: Option<u64>, data: T) -> Self {
         Self {
             uuid,
             timestamp,
             data,
         }
     }
-    #[must_use] pub fn new_empty(uuid: String, timestamp: Option<u64>) -> Self {
-        Self {
-            uuid,
-            timestamp,
-            data: std::collections::HashMap::default(),
-        }
-    }
 
-    #[must_use] pub const fn get_uuid(&self) -> &String {
-        &self.uuid
+    #[must_use] pub const fn get_uuid(&self) -> &str {
+        self.uuid
     }
 
     #[must_use] pub const fn get_timestamp(&self) -> Option<u64> {
         self.timestamp
     }
 
-    #[must_use] pub const fn get_data(&self) -> &HashMap<String, serde_json::Value> {
+    #[must_use] pub const fn get_data(&self) -> &T {
         &self.data
-    }
-
-    #[must_use] pub fn column_in_data(&self, column_name: &str) -> bool {
-        self.data.contains_key(column_name)
-    }
-
-    #[must_use] pub fn get_value_for_column(&self, column_name: &str) -> Option<&serde_json::Value> {
-        self.data.get(column_name)
-    }
-
-    pub fn insert_or_overwrite_column(&mut self, column_name: String, value: serde_json::Value) -> bool {
-        self.data.insert(column_name, value).is_some()
-    }
-
-    pub fn remove_column(&mut self, column_name: &str) -> Option<serde_json::Value> {
-        self.data.remove(column_name)
-    }
-
-    #[must_use] pub fn get_column_list(&self) -> Vec<&String> {
-        self.data.keys().collect()
     }
 }
 
@@ -249,32 +224,216 @@ impl SchemaBuilder {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
+pub trait ProducerBase: Serialize + Clone{
+    fn generate_schema() -> HashMap<String, DataTypes>;
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid`:
+    /// * `conductor_domain`:
+    ///
+    /// returns: Result<(Vec<u8, Global>, Url), &str>
+    ///
+    /// # Errors
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    fn generate_emit_data(&self, uuid: &str, conductor_domain: Url) -> Result<(Vec<u8>, Url), &'static str> {
+        let url = match conductor_domain.join("/v1/producer/emit") {
+            Ok(u) => u,
+            Err(_) => todo!()
+        };
+        let emit:Emit<Self> = Emit{
+            uuid,
+            timestamp: None,
+            data: self.clone()
+        };
+        let payload = match rmp_serde::to_vec_named(&emit) {
+            Ok(p) => p,
+            Err(err) => todo!()
+        };
+        Ok((payload, url))
+    }
+
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `name`:
+    /// * `uuid`:
+    /// * `conductor_domain`:
+    ///
+    /// returns: Result<(Vec<u8, Global>, Url), &str>
+    ///# Errors
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    fn prepare_registration_data(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<(Vec<u8>, Url), &'static str> {
+        let url = match conductor_domain.join("/v1/producer/register") {
+            Ok(u) => u,
+            Err(_) => todo!()
+        };
+
+        let reg = Registration {
+            name: name.to_string(),
+            schema: Self::generate_schema(),
+            use_custom_id: uuid
+        };
+        let payload = match rmp_serde::to_vec_named(&reg){
+            Ok(m) => m,
+            Err(_) => todo!()
+        };
+        Ok((payload, url))
+    }
+
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `result`:
+    ///
+    /// returns: Result<(), &str>
+    ///
+    /// # Errors
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    fn process_emit_result(&self, result: EmitResult) -> Result<(), &'static str> {
+        match ErrorCode::try_from(result.error) {
+            Ok(error_code) => {
+                match error_code {
+                    ErrorCode::NoError => Ok(()),
+                    ErrorCode::TimestampDefined => todo!(),
+                    ErrorCode::NoMembers => todo!(),
+                    ErrorCode::InvalidColumnNames => todo!(),
+                    ErrorCode::TooManyColumns => todo!(),
+                    ErrorCode::InternalError => todo!(),
+                    ErrorCode::InvalidUuid => todo!(),
+                    ErrorCode::NameInvalid => todo!(),
+                    ErrorCode::Unregistered => todo!(),
+                    ErrorCode::InvalidData => todo!()
+                }
+            },
+            Err(err) => todo!()
+        }
+    }
+}
 
 #[cfg(feature = "async")]
 #[async_trait]
 #[allow(clippy::module_name_repetitions)]
-pub trait AsyncProducer {
-    async fn emit_raw(uuid: &str, conductor_url: Url, data: &[u8]) -> Result<(), &'static str>
+pub trait AsyncProducer: ProducerBase {
+    async fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), &'static str>
     {
-        Err("")
+        let (payload, url) = match self.generate_emit_data(uuid, conductor_domain) {
+            Ok(p) => p,
+            Err(err) => todo!()
+        };
+        //start blocking specific
+        let client = reqwest::Client::new();
+        let request_resp = client.post(url)
+            .body(payload)
+            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .send().await;
+        let response = match request_resp {
+            Ok(r) => r,
+            Err(err) => todo!()
+        };
+        let result:EmitResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
+            Ok(r) => r,
+            Err(err) => todo!()
+        };
+        //end blocking specific code
+        self.process_emit_result(result)
     }
     //Generate the schema for this struct and register it with conductor
-    async fn register(name: &str, uuid: Option<String>, conductor_url: Url) -> Result<String, &'static str>
+    async fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, &'static str>
     {
-        Err("")
+        //TODO handle errors correctly
+        let (payload, url) = match Self::prepare_registration_data(name, uuid, conductor_domain) {
+            Ok(pu) => pu,
+            Err(_) => todo!()
+        };
+        let client = reqwest::Client::new();
+        let request =  client.post(url)
+            .body(payload)
+            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .send().await;
+        let response = match request {
+            Ok(r) => r,
+            Err(_) => todo!()
+        };
+        let result:RegistrationResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
+            Ok(r) => r,
+            Err(_) => todo!()
+        };
+        Ok(result.uuid.unwrap())
     }
-    async fn is_registered(uuid: &str, conductor_url: Url) -> Result<bool, &'static str>
+    async fn is_registered(uuid: &str, conductor_domain: Url) -> Result<bool, &'static str>
     {
-        Err("")
+        let url = match conductor_domain.join("/v1/producer/check") {
+            Ok(u) => u,
+            Err(_) => todo!()
+        };
+        let params = [("uuid", uuid)];
+        let client = reqwest::Client::new();
+        match client.get(url).query(&params).send().await {
+            Ok(response) => {
+                Ok(response.status().is_success())
+            },
+            Err(_) => todo!()
+        }
     }
-    fn generate_schema() -> HashMap<String, DataTypes>;
+
 }
 
 
-pub trait Producer {
-    fn emit_raw(_uuid: &str, _conductor_url: Url, _data: &[u8]) -> Result<(), &'static str>
+pub trait Producer: ProducerBase {
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid`:
+    /// * `conductor_url`:
+    /// # Errors
+    /// returns: Result<(), &str>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), &'static str>
     {
-        Err("")
+        let (payload, url) = match self.generate_emit_data(uuid, conductor_domain) {
+            Ok(p) => p,
+            Err(err) => todo!()
+        };
+        //start blocking specific
+        let client = reqwest::blocking::Client::new();
+        let request_resp = client.post(url)
+            .body(payload)
+            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .send();
+        let response = match request_resp {
+            Ok(r) => r,
+            Err(err) => todo!()
+        };
+        let result:EmitResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
+            Ok(r) => r,
+            Err(err) => todo!()
+        };
+        //end blocking specific code
+        self.process_emit_result(result)
     }
     ///
     /// TODO
@@ -293,40 +452,58 @@ pub trait Producer {
     ///
     /// ```
     //Generate the schema for this struct and register it with conductor
-    fn register(name: &str, uuid: Option<String>, conductor_url: Url) -> Result<String, &'static str>
+    fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, &'static str>
     {
         //TODO handle errors correctly
-        let reg = Registration {
-            name: name.to_string(),
-            schema: Self::generate_schema(),
-            use_custom_id: uuid
+        let (payload, url) = match Self::prepare_registration_data(name, uuid, conductor_domain) {
+            Ok(pu) => pu,
+            Err(_) => todo!()
         };
         let client = reqwest::blocking::Client::new();
-        let request = {
-            let msg_pack = match rmp_serde::to_vec_named(&reg){
-                Ok(m) => m,
-                Err(_) => return Err("there was an error serializing the registration struct")
-            };
-            client.post(conductor_url)
-                .body(msg_pack)
-                .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack")).send()
-        };
+        let request =  client.post(url)
+            .body(payload)
+            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .send();
         let response = match request {
             Ok(r) => r,
-            Err(_) => return Err("There was an error sending the registration")
+            Err(_) => todo!()
         };
         let result:RegistrationResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
             Ok(r) => r,
-            Err(_) => return Err("Couldn't deserialize the registration response")
+            Err(_) => todo!()
         };
         Ok(result.uuid.unwrap())
     }
 
-    fn is_registered(_uuid: &str, _conductor_url: Url) -> Result<bool, &'static str>
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `_uuid`:
+    /// * `conductor_base_url`:
+    ///
+    /// returns: Result<bool, &str>
+    /// # Errors
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    fn is_registered(uuid: &str, conductor_domain: Url) -> Result<bool, &'static str>
     {
-        Err("")
+        let url = match conductor_domain.join("/v1/producer/check") {
+            Ok(u) => u,
+            Err(_) => todo!()
+        };
+        let params = [("uuid", uuid)];
+        let client = reqwest::blocking::Client::new();
+        match client.get(url).query(&params).send() {
+            Ok(response) => {
+                Ok(response.status().is_success())
+            },
+            Err(_) => todo!()
+        }
     }
-    fn generate_schema() -> HashMap<String, DataTypes>;
 }
 
 pub trait ToProducerData {
