@@ -5,8 +5,6 @@ use duplicate::duplicate;
 use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
 #[cfg(feature = "async")]
 use async_trait::async_trait;
-use num_enum::TryFromPrimitive;
-use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -37,25 +35,45 @@ impl DataTypes {
 }
 
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, TryFromPrimitive)]
-#[repr(u8)]
-pub enum ErrorCode {
-    NoError = 0,
-    TimestampDefined = 1,
-    NoMembers = 2,
-    InvalidColumnNames = 3,
-    TooManyColumns = 4,
-    InternalError = 5,
-    InvalidUuid = 6,
-    NameInvalid = 7,
-    Unregistered = 8,
-    InvalidData = 9,
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum ConductorError {
+    NoError,
+    TimestampDefined (String),
+    NoMembers(String),
+    InvalidColumnNames(String),
+    TooManyColumns(String),
+    InternalError(String),
+    InvalidUuid(String),
+    NameInvalid(String),
+    Unregistered(String),
+    InvalidData(String),
+    InvalidSchema(String),
+}
+
+impl std::error::Error for ConductorError {}
+
+impl fmt::Display for ConductorError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ConductorError::NoError => write!(f, "NoError"),
+            ConductorError::TimestampDefined(message) => write!(f, "NoError: {}", message),
+            ConductorError::NoMembers(message) => write!(f, "NoMembers: {}", message),
+            ConductorError::InvalidColumnNames(message) => write!(f, "InvalidColumnNames: {}", message),
+            ConductorError::TooManyColumns(message) => write!(f, "TooManyColumns: {}", message),
+            ConductorError::InternalError(message) => write!(f, "InternalError: {}", message),
+            ConductorError::InvalidUuid(message) => write!(f, "InvalidUuid: {}", message),
+            ConductorError::NameInvalid(message) => write!(f, "NameInvalid: {}", message),
+            ConductorError::Unregistered(message) => write!(f, "Unregistered: {}", message),
+            ConductorError::InvalidData(message) => write!(f, "InvalidData: {}", message),
+            ConductorError::InvalidSchema(message) => write!(f, "InvalidSchema: {}", message),
+        }
+    }
 }
 
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegistrationResult {
-    pub error: u8,
+    pub error: ConductorError,
     pub uuid: Option<String>,
 }
 
@@ -169,9 +187,9 @@ impl<'a, T> Emit<'a, T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmitResult {
-    pub error: u8,
+    pub error: ConductorError,
 }
 
 
@@ -253,7 +271,15 @@ impl SchemaBuilder {
 #[derive(Debug)]
 pub enum Error {
     InvalidConductorDomain(String),
-    SerialisationFailure(String),
+    MsgPackSerialisationFailure(rmp_serde::encode::Error),
+    JsonSerialisationFailure(serde_json::Error),
+    GenericSerialisationFailure(Box<dyn std::error::Error>),
+    ConductorError(ConductorError),
+    NetworkError(reqwest::Error),
+    MsgPackDeserializationFailure(rmp_serde::decode::Error),
+    JsonDeserializationFailure(serde_json::Error),
+    GenericDeserializationFailure(Box<dyn std::error::Error>),
+
 }
 
 
@@ -263,7 +289,14 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Error::InvalidConductorDomain(message) => write!(f, "InvalidConductorDomain: {}", message),
-            Error::SerialisationFailure(message) => write!(f, "SerialisationFailure: {}", message),
+            Error::MsgPackSerialisationFailure(encode_error) => write!(f, "MsgPackSerialisationFailure: {}", encode_error),
+            Error::ConductorError(ce) => write!(f, "ConductorError: {}", ce),
+            Error::NetworkError(re) => write!(f, "NetworkError: {}", re),
+            Error::MsgPackDeserializationFailure(decode_error) => write!(f, "MsgPackDeserializationFailure: {}", decode_error),
+            Error::JsonSerialisationFailure(encode_error) => write!(f, "JsonSerialisationFailure: {}", encode_error),
+            Error::GenericSerialisationFailure(encode_error) => write!(f, "GenericSerialisationFailure: {}", encode_error),
+            Error::JsonDeserializationFailure(decode_error) => write!(f, "JsonDeserializationFailure: {}", decode_error),
+            Error::GenericDeserializationFailure(decode_error) => write!(f, "GenericDeserializationFailure: {}", decode_error),
         }
     }
 }
@@ -272,6 +305,7 @@ pub trait Base: Serialize + Clone {
     fn generate_schema() -> HashMap<String, DataTypes>;
 
     ///
+    /// Prepares a payload for emitting data. This function doesn't send the payload.
     ///
     /// # Arguments
     ///
@@ -281,7 +315,7 @@ pub trait Base: Serialize + Clone {
     /// # Errors
     ///
     /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
-    /// * `SerialisationFailure`: Produced when the emit payload cannot be serialised. This is most likely
+    /// * `SerialisationFailure`: Produced when the emit payload cannot be serialised to the message pack format. This is most likely
     /// due to a difficulty serialising Self using serde.
     /// # Example
     ///
@@ -316,13 +350,14 @@ pub trait Base: Serialize + Clone {
         let payload = match rmp_serde::to_vec_named(&emit) {
             Ok(p) => p,
             Err(err) => {
-                return Err(Error::SerialisationFailure(format!("Failed to serialize emit payload. Most likely due to an issue serialising Self {}", err)));
+                return Err(Error::MsgPackSerialisationFailure(err));
             }
         };
         Ok((payload, url))
     }
 
     ///
+    /// Prepares the payload used for registration. Registration is not done by this function.
     ///
     /// # Arguments
     ///
@@ -334,8 +369,8 @@ pub trait Base: Serialize + Clone {
     ///
     ///# Errors
     ///
-    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url
-    /// * `SerialisationFailure`: Produced when the emit payload cannot be serialised.
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `MsgPackSerialisationFailure`: Produced when the emit payload cannot be serialised to the message pack format.
     ///
     /// # Example
     ///
@@ -371,45 +406,10 @@ pub trait Base: Serialize + Clone {
         let payload = match rmp_serde::to_vec_named(&reg) {
             Ok(m) => m,
             Err(err) => {
-                return Err(Error::SerialisationFailure(format!("Failed to serialize registration payload.  {}", err)));
+                return Err(Error::MsgPackSerialisationFailure(err));
             }
         };
         Ok((payload, url))
-    }
-
-    ///
-    ///
-    /// # Arguments
-    ///
-    /// * `result`:
-    ///
-    /// returns: Result<(), &str>
-    ///
-    /// # Errors
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
-    fn process_emit_result(&self, result: EmitResult) -> Result<(), &'static str> {
-        match ErrorCode::try_from(result.error) {
-            Ok(error_code) => {
-                match error_code {
-                    ErrorCode::NoError => Ok(()),
-                    ErrorCode::TimestampDefined => todo!(),
-                    ErrorCode::NoMembers => todo!(),
-                    ErrorCode::InvalidColumnNames => todo!(),
-                    ErrorCode::TooManyColumns => todo!(),
-                    ErrorCode::InternalError => todo!(),
-                    ErrorCode::InvalidUuid => todo!(),
-                    ErrorCode::NameInvalid => todo!(),
-                    ErrorCode::Unregistered => todo!(),
-                    ErrorCode::InvalidData => todo!()
-                }
-            }
-            Err(err) => todo!()
-        }
     }
 }
 
@@ -417,28 +417,30 @@ pub trait Base: Serialize + Clone {
 #[async_trait]
 #[allow(clippy::module_name_repetitions)]
 pub trait AsyncProducer: Base {
-    async fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), &'static str>
+    async fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), Error>
     {
-        let (payload, url) = match self.generate_emit_data(uuid, conductor_domain) {
-            Ok(p) => p,
-            Err(err) => todo!()
-        };
+        let (payload, url) = self.generate_emit_data(uuid, conductor_domain)?;
+
         //start blocking specific
         let client = reqwest::Client::new();
         let request_resp = client.post(url)
             .body(payload)
             .header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/msgpack"))
             .send().await;
+
         let response = match request_resp {
             Ok(r) => r,
-            Err(err) => todo!()
+            Err(err) => return Err(Error::NetworkError(err))
         };
         let result: EmitResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
             Ok(r) => r,
-            Err(err) => todo!()
+            Err(err) => return Err(MsgPackDeserializationFailure(err))
         };
         //end blocking specific code
-        self.process_emit_result(result)
+        if result.error == ConductorError::NoError {
+            return Ok(());
+        }
+        Err(Error::ConductorError(result.error))
     }
     //Generate the schema for this struct and register it with conductor
     async fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, &'static str>
@@ -496,12 +498,10 @@ pub trait Producer: Base {
     /// ```
     ///
     /// ```
-    fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), &'static str>
+    fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), Error>
     {
-        let (payload, url) = match self.generate_emit_data(uuid, conductor_domain) {
-            Ok(p) => p,
-            Err(err) => todo!()
-        };
+        let (payload, url) = self.generate_emit_data(uuid, conductor_domain)?;
+
         //start blocking specific
         let client = reqwest::blocking::Client::new();
         let request_resp = client.post(url)
@@ -517,10 +517,13 @@ pub trait Producer: Base {
             Err(err) => todo!()
         };
         //end blocking specific code
-        self.process_emit_result(result)
+        match &result.error {
+            ConductorError::NoError => Ok(()),
+            _ => Err(Error::ConductorError(result.error))
+        }
     }
     ///
-    /// TODO
+    ///
     /// # Arguments
     ///
     /// * `name`:

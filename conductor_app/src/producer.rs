@@ -17,8 +17,8 @@ macro_rules! log_error_with_json {
 }
 
 macro_rules! log_error_and_get_emit_result {
-    ($errorCode:expr, $($args:tt)+) => {{
-        log::error!($($args)*);
+    ($errorCode:expr) => {{
+        log::error!("{}", $errorCode);
         Err($errorCode)
     }};
 }
@@ -101,18 +101,16 @@ async fn get_producer_row(
     db: &db::QuestDbConn,
     #[allow(clippy::ptr_arg)]
     uuid: &str,
-) -> Result<Producer, con_shared::ErrorCode> {
+) -> Result<Producer, con_shared::ConductorError> {
     if uuid.is_empty() {
         return log_error_and_get_emit_result!(
-            con_shared::ErrorCode::InvalidUuid,
-            "Incoming request had an empty uuid"
+            con_shared::ConductorError::InvalidUuid("Incoming request had an empty uuid".to_string())
         );
     }
     if uuid.is_empty() {
         return log_error_and_get_emit_result!(
-            con_shared::ErrorCode::NoMembers,
-            "Incoming request had no data with uuid {}",
-            &uuid
+            con_shared::ConductorError::NoMembers(format!("Incoming request had no data with uuid {}",
+            &uuid))
         );
     }
     //check if the uuid is in the db
@@ -124,25 +122,25 @@ async fn get_producer_row(
         Ok(rows) => rows,
         Err(error) => {
             return log_error_and_get_emit_result!(
-                con_shared::ErrorCode::Unregistered,
-                "Error getting producer from database {}",
-                error
+                con_shared::ConductorError::Unregistered(format!("Error getting producer from database {}",
+                error))
+
             );
         }
     };
     if rows.is_empty() {
         return log_error_and_get_emit_result!(
-            con_shared::ErrorCode::Unregistered,
-            "Error getting producer. No rows returned for uuid: {}",
-            &uuid
+            con_shared::ConductorError::Unregistered(format!("Error getting producer. No rows returned for uuid: {}",
+            &uuid))
+
         );
     }
     if rows.len() > 1 {
         //this shouldn't happen...
         return log_error_and_get_emit_result!(
-            con_shared::ErrorCode::InternalError,
-            "There were multiple entries for uuid: {}",
-            &uuid
+            con_shared::ConductorError::InternalError(format!("There were multiple entries for uuid: {}",
+            &uuid))
+
         );
     }
     if let Some(row) = rows.get(0) {
@@ -157,18 +155,17 @@ async fn get_producer_row(
             || producer.schema == default_string
         {
             return log_error_and_get_emit_result!(
-                con_shared::ErrorCode::InternalError,
-                "Couldn't deserialize row into struct for uuid: {}",
-                &uuid
+                con_shared::ConductorError::InternalError(format!("Couldn't deserialize row into struct for uuid: {}",
+                &uuid))
             );
         }
         Ok(producer)
     } else {
         //this should be impossible as we have checked that it's not empty
         log_error_and_get_emit_result!(
-            con_shared::ErrorCode::InternalError,
-            "Couldn't get the row from the row list for uuid: {}",
-            &uuid
+            con_shared::ConductorError::InternalError(format!("Couldn't get the row from the row list for uuid: {}",
+            &uuid))
+
         )
     }
 }
@@ -184,21 +181,22 @@ fn validate_emit_schema(data: &con_shared::Emit<'_, HashMap<String,serde_json::V
 }
 
 async fn register(db: &db::QuestDbConn, registration: &con_shared::Registration) -> con_shared::RegistrationResult {
+    //TODO this should use an option
     let error_code = validate_registration(registration);
-    if error_code != con_shared::ErrorCode::NoError {
+    if error_code != con_shared::ConductorError::NoError {
         return con_shared::RegistrationResult {
-            error: error_code as u8,
+            error: error_code,
             uuid: None,
         };
     }
 
     match persist_registration(registration, db).await {
         Ok(uuid) => con_shared::RegistrationResult {
-            error: error_code as u8,
+            error: error_code,
             uuid: Some(uuid),
         },
         Err(err) => con_shared::RegistrationResult {
-            error: err as u8,
+            error: err,
             uuid: None,
         },
     }
@@ -209,31 +207,31 @@ async fn emit(db: &db::QuestDbConn, data: &con_shared::Emit<'_,HashMap<String,se
         Ok(producer) => producer,
         Err(error_code) => {
             return con_shared::EmitResult {
-                error: error_code as u8,
+                error: error_code,
             };
         }
     };
-    if validate_emit_schema(data, &producer) {
+    if !validate_emit_schema(data, &producer) {
         return con_shared::EmitResult {
-            error: con_shared::ErrorCode::InvalidColumnNames as u8,
+            error: con_shared::ConductorError::InvalidSchema("Emitted schema didn't match registered schema".to_string()),
         };
     }
     // we know the schema is good, the uuid is good. The emit is good. Lets do this thing
     match persist_emit(data, db).await {
         Ok(_) => con_shared::EmitResult {
-            error: con_shared::ErrorCode::NoError as u8,
+            error: con_shared::ConductorError::NoError,
         },
-        Err(err) => con_shared::EmitResult { error: err as u8 },
+        Err(err) => con_shared::EmitResult { error: err},
     }
 }
 
-fn validate_registration(registration: &con_shared::Registration) -> con_shared::ErrorCode {
+fn validate_registration(registration: &con_shared::Registration) -> con_shared::ConductorError {
     if registration.get_name().is_empty() {
         log_error_with_json!(
             registration,
             "Producer registration failed. Producer name is empty."
         );
-        return con_shared::ErrorCode::NameInvalid;
+        return con_shared::ConductorError::NameInvalid("Producer registration failed. Producer name is empty.".to_string());
     }
     if let Some(custom_id) = &registration.get_custom_id() {
         if custom_id.is_empty() || custom_id.contains('.') || custom_id.contains('\"') {
@@ -241,33 +239,33 @@ fn validate_registration(registration: &con_shared::Registration) -> con_shared:
                 registration,
                 "Producer registration failed. Custom ID has illegal chars or is empty."
             );
-            return con_shared::ErrorCode::InvalidUuid;
+            return con_shared::ConductorError::InvalidUuid("Producer registration failed. Custom ID has illegal chars or is empty.".to_string());
         }
     }
     if registration.contains_column("ts") {
         log_error_with_json!(
             registration,
-            "Producer registration failed. column with name ts. This is a resereved name."
+            "Producer registration failed. column with name ts. This is a reserved name."
         );
-        return con_shared::ErrorCode::TimestampDefined;
+        return con_shared::ConductorError::TimestampDefined("Producer registration failed. column with name ts. This is a reserved name.".to_string());
     }
     if registration.get_schema().is_empty() {
         log_error_with_json!(registration, "Producer registration failed. No columns in schema.");
-        return con_shared::ErrorCode::NoMembers;
+        return con_shared::ConductorError::NoMembers("Producer registration failed. No columns in schema.".to_string());
     }
     for col in registration.get_schema().keys() {
         if col.contains('.') || col.contains('\"') {
             log_error_with_json!(registration, "Producer registration failed. Column with name {} is invalid as it contains a '.' or a '\"'.", col);
-            return con_shared::ErrorCode::InvalidColumnNames;
+            return con_shared::ConductorError::InvalidColumnNames(format!("Producer registration failed. Column with name {} is invalid as it contains a '.' or a '\"'.", col));
         }
     }
     if registration.schema_len() > 2_147_483_647 {
         //I mean this is invalid. But seriously how did we get here
         log_error_with_json!(registration, "Producer schema registration had {} columns which is more than the maximum quest can support of 2,147,483,647.", registration.schema_len());
-        return con_shared::ErrorCode::TooManyColumns;
+        return con_shared::ConductorError::TooManyColumns(format!("Producer schema registration had {} columns which is more than the maximum quest can support of 2,147,483,647.", registration.schema_len()));
     }
 
-    con_shared::ErrorCode::NoError
+    con_shared::ConductorError::NoError
 }
 
 fn generate_create_table_sql(registration: &con_shared::Registration, table_name: &str) -> String {
@@ -299,7 +297,7 @@ fn generate_data_for_creation(registration: &con_shared::Registration, uuid: &st
     )
 }
 
-async fn persist_registration(registration: &con_shared::Registration, db: &db::QuestDbConn) -> Result<String, con_shared::ErrorCode> {
+async fn persist_registration(registration: &con_shared::Registration, db: &db::QuestDbConn) -> Result<String, con_shared::ConductorError> {
     let uuid = get_or_create_uuid_for_registration(registration);
     let (create_table_sql, producer_name, schema_json, uuid_copy) = generate_data_for_creation(registration, &uuid);
 
@@ -324,7 +322,7 @@ async fn persist_registration(registration: &con_shared::Registration, db: &db::
                 "There was an error persisting the producer to the db: {}",
                 err
             );
-            Err(con_shared::ErrorCode::InternalError)
+            Err(con_shared::ConductorError::InternalError(format!("There was an error persisting the producer to the db: {}", err)))
         }
     }
 }
@@ -350,31 +348,21 @@ fn get_insert_sql(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Value>>
 }
 
 
-async fn persist_emit(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Value>>, db: &db::QuestDbConn) -> Result<(), con_shared::ErrorCode> {
-    let schema_json = match get_producer_row(db, emit.get_uuid()).await {
-        Ok(p) => p.schema,
-        Err(ec) => {
-            return log_error_and_get_emit_result!(
-                ec,
-                "Error persisting producer emit to db. Couldn't get producer  for uuid: {}",
-                emit.get_uuid()
-            );
-        }
-    };
+async fn persist_emit(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Value>>, db: &db::QuestDbConn) -> Result<(), con_shared::ConductorError> {
+    let schema_json = get_producer_row(db, emit.get_uuid()).await?.schema;
     if schema_json.is_empty() {
         return log_error_and_get_emit_result!(
-            con_shared::ErrorCode::NoMembers,
-            "Error persisting producer emit to db. Empty registered schema for uuid: {}",
-            emit.get_uuid()
+            con_shared::ConductorError::NoMembers(format!("Error persisting producer emit to db. Empty registered schema for uuid: {}",
+            emit.get_uuid()))
         );
     }
     let schema: con_shared::Schema;
     match serde_json::from_str(schema_json.as_str()) {
         Ok(s) => schema = s,
-        Err(err) => return log_error_and_get_emit_result!(con_shared::ErrorCode::NoMembers, "Error persisting producer emit to db. Empty registered schema for uuid: {} with error: {}", emit.get_uuid(), err),
+        Err(err) => return log_error_and_get_emit_result!(con_shared::ConductorError::NoMembers(format!("Error persisting producer emit to db. Empty registered schema for uuid: {} with error: {}", emit.get_uuid(), err))),
     };
 
-    //pull out keys and values to garantee order!
+    //pull out keys and values to guarantee order!
     let mut columns = Vec::new();
     let mut params_store: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
     for (key, val) in emit.get_data() {
@@ -384,9 +372,8 @@ async fn persist_emit(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Val
             data_type = dt;
         } else {
             return log_error_and_get_emit_result!(
-                con_shared::ErrorCode::InvalidColumnNames,
-                "Error persisting producer emit to db. Schema doesn't contain key {}",
-                key
+                con_shared::ConductorError::InvalidColumnNames(format!("Error persisting producer emit to db. Schema doesn't contain key {}",
+                key))
             );
         }
 
@@ -394,9 +381,9 @@ async fn persist_emit(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Val
             Ok(param) => params_store.push(param),
             Err(err) => {
                 return log_error_and_get_emit_result!(
-                    con_shared::ErrorCode::InvalidData,
-                    "Error persisting producer emit to db. Couldn't parse data packet. {}",
-                    err
+                    con_shared::ConductorError::InvalidData(format!("Error persisting producer emit to db. Couldn't parse data packet. {}",
+                    err))
+
                 );
             }
         }
@@ -418,9 +405,9 @@ async fn persist_emit(emit: &con_shared::Emit<'_, HashMap<String,serde_json::Val
         Ok(_) => Ok(()),
         Err(err) => {
             log_error_and_get_emit_result!(
-                con_shared::ErrorCode::InternalError,
-                "Error persisting producer emit to db. Couldn't parse data packet. {}",
-                err
+                con_shared::ConductorError::InternalError(format!("Error persisting producer emit to db. Couldn't parse data packet. {}",
+                err))
+
             )
         }
     }

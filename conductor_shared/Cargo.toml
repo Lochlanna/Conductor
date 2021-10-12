@@ -8,15 +8,17 @@ edition = "2018"
 [dependencies]
 serde = { version = "1.0.*", features = ["derive"] }
 serde_json = "1.0.0"
+rmp-serde = { version = "0.15.*"}
 chrono = { version = "0.4.*", features = ["serde"] }
 url = "2.2.2"
 duplicate = "0.3.0"
 num_enum = "0.5.4"
+strum = { version = "0.22", features = ["derive"] }
 
 reqwest = { version = "0.11", features = ["blocking"] }
 tokio = { version = "1", features = ["full"], optional = true }
 async-trait = {version = "0.1.51", optional = true}
-rmp-serde = { version = "0.15.*"}
+
 
 [features]
 default = []
