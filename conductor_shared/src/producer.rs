@@ -7,6 +7,8 @@ use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
 use async_trait::async_trait;
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
+use std::fmt;
+use std::fmt::Formatter;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum DataTypes {
@@ -20,7 +22,8 @@ pub enum DataTypes {
 }
 
 impl DataTypes {
-    #[must_use] pub const fn to_quest_type_str(&self) -> &str {
+    #[must_use]
+    pub const fn to_quest_type_str(&self) -> &str {
         match self {
             DataTypes::Int => "long",
             DataTypes::Float => "float",
@@ -66,7 +69,8 @@ pub struct Registration {
 }
 
 impl Registration {
-    #[must_use] pub const fn new(name: String, schema: Schema, custom_id: Option<String>) -> Self {
+    #[must_use]
+    pub const fn new(name: String, schema: Schema, custom_id: Option<String>) -> Self {
         Self {
             name,
             schema,
@@ -74,7 +78,8 @@ impl Registration {
         }
     }
 
-    #[must_use] pub fn new_empty(name: String) -> Self {
+    #[must_use]
+    pub fn new_empty(name: String) -> Self {
         Self {
             name,
             schema: std::collections::HashMap::default(),
@@ -82,7 +87,8 @@ impl Registration {
         }
     }
 
-    #[must_use] pub fn get_name(&self) -> &str {
+    #[must_use]
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -94,10 +100,12 @@ impl Registration {
         self.use_custom_id = Some(id);
     }
 
-    #[must_use] pub const fn has_custom_id(&self) -> bool {
+    #[must_use]
+    pub const fn has_custom_id(&self) -> bool {
         self.use_custom_id.is_some()
     }
-    #[must_use] pub fn get_custom_id(&self) -> Option<&str> {
+    #[must_use]
+    pub fn get_custom_id(&self) -> Option<&str> {
         if let Some(c_id) = &self.use_custom_id {
             return Some(c_id.as_str());
         }
@@ -112,15 +120,18 @@ impl Registration {
         self.schema.remove(column_name).is_some()
     }
 
-    #[must_use] pub fn contains_column(&self, column_name: &str) -> bool {
+    #[must_use]
+    pub fn contains_column(&self, column_name: &str) -> bool {
         self.schema.contains_key(column_name)
     }
 
-    #[must_use] pub fn schema_len(&self) -> usize {
+    #[must_use]
+    pub fn schema_len(&self) -> usize {
         self.schema.len()
     }
 
-    #[must_use] pub const fn get_schema(&self) -> &Schema {
+    #[must_use]
+    pub const fn get_schema(&self) -> &Schema {
         &self.schema
     }
 }
@@ -132,8 +143,9 @@ pub struct Emit<'a, T> {
     data: T,
 }
 
-impl <'a, T> Emit<'a, T> {
-    #[must_use] pub const fn new(uuid: &'a str, timestamp: Option<u64>, data: T) -> Self {
+impl<'a, T> Emit<'a, T> {
+    #[must_use]
+    pub const fn new(uuid: &'a str, timestamp: Option<u64>, data: T) -> Self {
         Self {
             uuid,
             timestamp,
@@ -141,15 +153,18 @@ impl <'a, T> Emit<'a, T> {
         }
     }
 
-    #[must_use] pub const fn get_uuid(&self) -> &str {
+    #[must_use]
+    pub const fn get_uuid(&self) -> &str {
         self.uuid
     }
 
-    #[must_use] pub const fn get_timestamp(&self) -> Option<u64> {
+    #[must_use]
+    pub const fn get_timestamp(&self) -> Option<u64> {
         self.timestamp
     }
 
-    #[must_use] pub const fn get_data(&self) -> &T {
+    #[must_use]
+    pub const fn get_data(&self) -> &T {
         &self.data
     }
 }
@@ -171,90 +186,138 @@ impl Default for SchemaBuilder {
 }
 
 impl SchemaBuilder {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             schema: std::collections::HashMap::default()
         }
     }
 
     //noinspection RsSelfConvention
-    #[must_use] pub fn with_capacity(n: usize) -> Self {
+    #[must_use]
+    pub fn with_capacity(n: usize) -> Self {
         Self {
             schema: HashMap::with_capacity(n)
         }
     }
 
-    #[must_use] pub fn add_column(mut self, name: String, col_type: DataTypes) -> Self {
+    #[must_use]
+    pub fn add_column(mut self, name: String, col_type: DataTypes) -> Self {
         self.schema.insert(name, col_type);
         self
     }
 
-    #[must_use] pub fn add_int(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_int(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Int);
         self
     }
-    #[must_use] pub fn add_float(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_float(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Float);
         self
     }
-    #[must_use] pub fn add_time(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_time(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Time);
         self
     }
-    #[must_use] pub fn add_binary(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_binary(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Binary);
         self
     }
-    #[must_use] pub fn add_string(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_string(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::String);
         self
     }
-    #[must_use] pub fn add_bool(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_bool(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Bool);
         self
     }
-    #[must_use] pub fn add_double(mut self, name: String) -> Self {
+    #[must_use]
+    pub fn add_double(mut self, name: String) -> Self {
         self.schema.insert(name, DataTypes::Double);
         self
     }
 
     #[allow(clippy::missing_const_for_fn)]
-    #[must_use] pub fn build(self) -> Schema {
+    #[must_use]
+    pub fn build(self) -> Schema {
         self.schema
     }
 }
 
-#[allow(clippy::module_name_repetitions)]
-pub trait ProducerBase: Serialize + Clone{
+#[derive(Debug)]
+pub enum Error {
+    InvalidConductorDomain(String),
+    SerialisationFailure(String),
+}
+
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::InvalidConductorDomain(message) => write!(f, "InvalidConductorDomain: {}", message),
+            Error::SerialisationFailure(message) => write!(f, "SerialisationFailure: {}", message),
+        }
+    }
+}
+
+pub trait Base: Serialize + Clone {
     fn generate_schema() -> HashMap<String, DataTypes>;
+
     ///
     ///
     /// # Arguments
     ///
-    /// * `uuid`:
-    /// * `conductor_domain`:
-    ///
-    /// returns: Result<(Vec<u8, Global>, Url), &str>
+    /// * `uuid`: The unique ID of this producer.
+    /// * `conductor_domain`: The url to the conductor instance.
     ///
     /// # Errors
-    /// # Examples
+    ///
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `SerialisationFailure`: Produced when the emit payload cannot be serialised. This is most likely
+    /// due to a difficulty serialising Self using serde.
+    /// # Example
     ///
     /// ```
-    ///
+    /// use std::collections::HashMap;
+    /// use conductor_shared::producer::{Base, DataTypes};
+    /// #[derive(Clone, Serialize)]
+    /// struct Measurement {
+    ///     data_point:u8
+    /// }
+    /// impl Base for Measurement {
+    ///     fn generate_schema() -> HashMap<String, DataTypes> {
+    ///         unimplemented!("Not needed for example/test");
+    ///     }
+    /// }
+    /// let m = Measurement {
+    ///     data_point: 10
+    /// };
+    /// let expected:Vec<u8> = vec![3,4,5];
+    /// assert_eq!(m, expected);
     /// ```
-    fn generate_emit_data(&self, uuid: &str, conductor_domain: Url) -> Result<(Vec<u8>, Url), &'static str> {
+    fn generate_emit_data(&self, uuid: &str, conductor_domain: Url) -> Result<(Vec<u8>, Url), Error> {
         let url = match conductor_domain.join("/v1/producer/emit") {
             Ok(u) => u,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::InvalidConductorDomain(format!("The conductor domain was invalid. {}", err)))
         };
-        let emit:Emit<Self> = Emit{
+        let emit: Emit<Self> = Emit {
             uuid,
             timestamp: None,
-            data: self.clone()
+            data: self.clone(),
         };
         let payload = match rmp_serde::to_vec_named(&emit) {
             Ok(p) => p,
-            Err(err) => todo!()
+            Err(err) => {
+                return Err(Error::SerialisationFailure(format!("Failed to serialize emit payload. Most likely due to an issue serialising Self {}", err)));
+            }
         };
         Ok((payload, url))
     }
@@ -263,31 +326,53 @@ pub trait ProducerBase: Serialize + Clone{
     ///
     /// # Arguments
     ///
-    /// * `name`:
-    /// * `uuid`:
-    /// * `conductor_domain`:
+    /// * `name`: The name of the producer.
+    /// This doesn't need to be unique in a Conductor network although it may be helpful to you if it is.
+    /// * `uuid`: The unique ID string to identify this producer. If it's none one will be generated by the
+    /// Conductor server and returned to us. Most of the time you'll want to leave this as None.
+    /// * `conductor_domain`: The url to the conductor instance.
     ///
-    /// returns: Result<(Vec<u8, Global>, Url), &str>
     ///# Errors
-    /// # Examples
+    ///
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url
+    /// * `SerialisationFailure`: Produced when the emit payload cannot be serialised.
+    ///
+    /// # Example
     ///
     /// ```
-    ///
+    /// use std::collections::HashMap;
+    /// use conductor_shared::producer::{Base, DataTypes};
+    /// #[derive(Clone, Serialize)]
+    /// struct Measurement {
+    ///     data_point:u8
+    /// }
+    /// impl Base for Measurement {
+    ///     fn generate_schema() -> HashMap<String, DataTypes> {
+    ///         unimplemented!("Not needed for example/test");
+    ///     }
+    /// }
+    /// let m = Measurement {
+    ///     data_point: 10
+    /// };
+    /// let expected:Vec<u8> = vec![3,4,5];
+    /// assert_eq!(m, expected);
     /// ```
-    fn prepare_registration_data(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<(Vec<u8>, Url), &'static str> {
+    fn prepare_registration_data(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<(Vec<u8>, Url), Error> {
         let url = match conductor_domain.join("/v1/producer/register") {
             Ok(u) => u,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::InvalidConductorDomain(format!("The conductor domain was invalid. {}", err)))
         };
 
         let reg = Registration {
             name: name.to_string(),
             schema: Self::generate_schema(),
-            use_custom_id: uuid
+            use_custom_id: uuid,
         };
-        let payload = match rmp_serde::to_vec_named(&reg){
+        let payload = match rmp_serde::to_vec_named(&reg) {
             Ok(m) => m,
-            Err(_) => todo!()
+            Err(err) => {
+                return Err(Error::SerialisationFailure(format!("Failed to serialize registration payload.  {}", err)));
+            }
         };
         Ok((payload, url))
     }
@@ -322,7 +407,7 @@ pub trait ProducerBase: Serialize + Clone{
                     ErrorCode::Unregistered => todo!(),
                     ErrorCode::InvalidData => todo!()
                 }
-            },
+            }
             Err(err) => todo!()
         }
     }
@@ -331,7 +416,7 @@ pub trait ProducerBase: Serialize + Clone{
 #[cfg(feature = "async")]
 #[async_trait]
 #[allow(clippy::module_name_repetitions)]
-pub trait AsyncProducer: ProducerBase {
+pub trait AsyncProducer: Base {
     async fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), &'static str>
     {
         let (payload, url) = match self.generate_emit_data(uuid, conductor_domain) {
@@ -342,13 +427,13 @@ pub trait AsyncProducer: ProducerBase {
         let client = reqwest::Client::new();
         let request_resp = client.post(url)
             .body(payload)
-            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/msgpack"))
             .send().await;
         let response = match request_resp {
             Ok(r) => r,
             Err(err) => todo!()
         };
-        let result:EmitResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
+        let result: EmitResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
             Ok(r) => r,
             Err(err) => todo!()
         };
@@ -364,15 +449,15 @@ pub trait AsyncProducer: ProducerBase {
             Err(_) => todo!()
         };
         let client = reqwest::Client::new();
-        let request =  client.post(url)
+        let request = client.post(url)
             .body(payload)
-            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/msgpack"))
             .send().await;
         let response = match request {
             Ok(r) => r,
             Err(_) => todo!()
         };
-        let result:RegistrationResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
+        let result: RegistrationResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
             Ok(r) => r,
             Err(_) => todo!()
         };
@@ -389,15 +474,14 @@ pub trait AsyncProducer: ProducerBase {
         match client.get(url).query(&params).send().await {
             Ok(response) => {
                 Ok(response.status().is_success())
-            },
+            }
             Err(_) => todo!()
         }
     }
-
 }
 
 
-pub trait Producer: ProducerBase {
+pub trait Producer: Base {
     ///
     ///
     /// # Arguments
@@ -422,13 +506,13 @@ pub trait Producer: ProducerBase {
         let client = reqwest::blocking::Client::new();
         let request_resp = client.post(url)
             .body(payload)
-            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/msgpack"))
             .send();
         let response = match request_resp {
             Ok(r) => r,
             Err(err) => todo!()
         };
-        let result:EmitResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
+        let result: EmitResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
             Ok(r) => r,
             Err(err) => todo!()
         };
@@ -460,15 +544,15 @@ pub trait Producer: ProducerBase {
             Err(_) => todo!()
         };
         let client = reqwest::blocking::Client::new();
-        let request =  client.post(url)
+        let request = client.post(url)
             .body(payload)
-            .header(reqwest::header::CONTENT_TYPE,reqwest::header::HeaderValue::from_static("application/msgpack"))
+            .header(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/msgpack"))
             .send();
         let response = match request {
             Ok(r) => r,
             Err(_) => todo!()
         };
-        let result:RegistrationResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
+        let result: RegistrationResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
             Ok(r) => r,
             Err(_) => todo!()
         };
@@ -479,7 +563,7 @@ pub trait Producer: ProducerBase {
     ///
     /// # Arguments
     ///
-    /// * `_uuid`:
+    /// * `uuid`:
     /// * `conductor_base_url`:
     ///
     /// returns: Result<bool, &str>
@@ -500,7 +584,7 @@ pub trait Producer: ProducerBase {
         match client.get(url).query(&params).send() {
             Ok(response) => {
                 Ok(response.status().is_success())
-            },
+            }
             Err(_) => todo!()
         }
     }
