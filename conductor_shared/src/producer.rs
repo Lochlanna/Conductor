@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use std::fmt;
 use std::fmt::Formatter;
 
+/// Data types supported by conductor
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum DataTypes {
     Int,
@@ -20,6 +21,7 @@ pub enum DataTypes {
 }
 
 impl DataTypes {
+    /// Converts the enum to a string representation which matches quest db data types.
     #[must_use]
     pub const fn to_quest_type_str(&self) -> &str {
         match self {
@@ -34,19 +36,31 @@ impl DataTypes {
     }
 }
 
-
+/// Errors produced by the Conductor Instance
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum ConductorError {
+    /// Indicates that there was no error. This exists to be more compatible with being sent over
+    /// the wire to clients which may not have proper support for options.
     NoError,
-    TimestampDefined (String),
+    /// Indicates that a Producer schema contains a timestamp field which is not allowed as it's generated automatically by Conductor
+    TimestampDefined(String),
+    /// Indicates that an empty schema was sent
     NoMembers(String),
+    /// Indicates that there was an issue with at least one of the columns in the schema using illegal characters or formatting
     InvalidColumnNames(String),
+    /// Indicates the schema is too large (> 2_147_483_647)
     TooManyColumns(String),
+    /// A generic Conductor error
     InternalError(String),
+    /// The uuid provided was invalid. This could be an invalid custom id during registration or an ID which has not been registered during all other actions.
     InvalidUuid(String),
+    /// The name provided is empty.
     NameInvalid(String),
+    /// Attempted to emit data without having first registered the Producer.
     Unregistered(String),
+    /// The data doesn't match the data type or cannot be converted to that data type
     InvalidData(String),
+    /// The schema sent in an emit doesn't match the one which was registered.
     InvalidSchema(String),
 }
 
@@ -70,15 +84,9 @@ impl fmt::Display for ConductorError {
     }
 }
 
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RegistrationResult {
-    pub error: ConductorError,
-    pub uuid: Option<String>,
-}
-
 pub type Schema = HashMap<String, DataTypes>;
 
+/// Contains the information required to register a producer with a Conductor server.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Registration {
     name: String,
@@ -97,25 +105,17 @@ impl Registration {
     }
 
     #[must_use]
-    pub fn new_empty(name: String) -> Self {
+    pub fn new_empty(name: String, custom_id: Option<String>) -> Self {
         Self {
             name,
             schema: std::collections::HashMap::default(),
-            use_custom_id: None,
+            use_custom_id: custom_id,
         }
     }
 
     #[must_use]
     pub fn get_name(&self) -> &str {
         &self.name
-    }
-
-    pub fn set_name(&mut self, name: &str) {
-        self.name = String::from(name);
-    }
-
-    pub fn set_custom_id(&mut self, id: String) {
-        self.use_custom_id = Some(id);
     }
 
     #[must_use]
@@ -128,14 +128,6 @@ impl Registration {
             return Some(c_id.as_str());
         }
         None
-    }
-
-    pub fn add_column(&mut self, column_name: String, data_type: DataTypes) -> bool {
-        self.schema.insert(column_name, data_type).is_some()
-    }
-
-    pub fn remove_column(&mut self, column_name: &str) -> bool {
-        self.schema.remove(column_name).is_some()
     }
 
     #[must_use]
@@ -154,6 +146,14 @@ impl Registration {
     }
 }
 
+///The response from the Conductor instance after a registration attempt
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RegistrationResult {
+    pub error: ConductorError,
+    pub uuid: Option<String>,
+}
+
+/// A new data packet to be sent to the Conductor instance
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Emit<'a, T> {
     uuid: &'a str,
@@ -192,7 +192,8 @@ pub struct EmitResult {
     pub error: ConductorError,
 }
 
-
+/// A struct which assists in building a schema.
+/// Most of the time this won't be necessary as the producer derive macro does this for you.
 pub struct SchemaBuilder {
     schema: Schema,
 }
@@ -211,7 +212,6 @@ impl SchemaBuilder {
         }
     }
 
-    //noinspection RsSelfConvention
     #[must_use]
     pub fn with_capacity(n: usize) -> Self {
         Self {
@@ -270,14 +270,23 @@ impl SchemaBuilder {
 
 #[derive(Debug)]
 pub enum Error {
+    /// The domain given for the conductor instance is invalid in some way
     InvalidConductorDomain(String),
+    /// Indicates a failure to serialize a struct to message pack
     MsgPackSerialisationFailure(rmp_serde::encode::Error),
+    /// Indicates a failure to serialize a struct to json
     JsonSerialisationFailure(serde_json::Error),
+    /// Indicates a failure to serialize a struct
     GenericSerialisationFailure(Box<dyn std::error::Error>),
+    /// Indicates an error which was emitted from the Conductor server (Internal Server Error)
     ConductorError(ConductorError),
+    /// Indicates an issue with the network layer
     NetworkError(reqwest::Error),
+    /// Indicates a failure to deserialize a struct from message pack
     MsgPackDeserializationFailure(rmp_serde::decode::Error),
+    /// Indicates a failure to deserialize a struct from json
     JsonDeserializationFailure(serde_json::Error),
+    /// Indicates a failure to deserialize a struct
     GenericDeserializationFailure(Box<dyn std::error::Error>),
 
 }
@@ -301,6 +310,10 @@ impl fmt::Display for Error {
     }
 }
 
+///
+/// Provides functionality that is shared between both the async and blocking versions of the Producer trait.
+/// Prepares and processes conductor requests and responses.
+///
 pub trait Base: Serialize + Clone {
     fn generate_schema() -> HashMap<String, DataTypes>;
 
@@ -310,7 +323,7 @@ pub trait Base: Serialize + Clone {
     /// # Arguments
     ///
     /// * `uuid`: The unique ID of this producer.
-    /// * `conductor_domain`: The url to the conductor instance.
+    /// * `conductor_domain`: The url of the conductor instance.
     ///
     /// # Errors
     ///
@@ -365,7 +378,7 @@ pub trait Base: Serialize + Clone {
     /// This doesn't need to be unique in a Conductor network although it may be helpful to you if it is.
     /// * `uuid`: The unique ID string to identify this producer. If it's none one will be generated by the
     /// Conductor server and returned to us. Most of the time you'll want to leave this as None.
-    /// * `conductor_domain`: The url to the conductor instance.
+    /// * `conductor_domain`: The url of the conductor instance.
     ///
     ///# Errors
     ///
@@ -413,15 +426,40 @@ pub trait Base: Serialize + Clone {
     }
 }
 
+///
+/// Provides functions to add Conductor interactions to a type. Turns the implementing type into
+/// a Conductor Producer. This version of the trait provides a Asynchronous version of the functions.
+/// Refer to `conductor::producer::Producer` for the blocking version.
+///
+/// This should not be implemented directly in most cases.
+/// Instead use the `#[derive(conductor::Producer)]` macro to generate everything for you.
+///
 #[cfg(feature = "async")]
 #[async_trait]
 #[allow(clippy::module_name_repetitions)]
 pub trait AsyncProducer: Base {
+    /// Async send a new data packet to the conductor server.
+    /// Messagepack is used as the format over the wire.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid`: The unique id of this producer which was registered with conductor.
+    /// * `conductor_domain`: The url of the conductor instance.
+    ///
+    /// # Errors
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `MsgPackSerialisationFailure`: Produced when the emit payload cannot be serialised to the message pack format. This is most likely
+    /// due to a difficulty serialising Self using serde.
+    /// * `NetworkError`: Produced when the http post fails for any reason. Holds the Reqwest Error Struct.
+    /// * `MsgPackDeserializationFailure`: Produced when the emit response couldn't be deserialized from message pack. Holds the
+    /// rmp_serde Error struct.
+    /// * `ConductorError`: Produced when there was an error on the server.
+    ///
     async fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), Error>
     {
         let (payload, url) = self.generate_emit_data(uuid, conductor_domain)?;
 
-        //start blocking specific
+        //start async specific
         let client = reqwest::Client::new();
         let request_resp = client.post(url)
             .body(payload)
@@ -434,22 +472,40 @@ pub trait AsyncProducer: Base {
         };
         let result: EmitResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
             Ok(r) => r,
-            Err(err) => return Err(MsgPackDeserializationFailure(err))
+            Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
-        //end blocking specific code
+        //end async specific code
         if result.error == ConductorError::NoError {
             return Ok(());
         }
         Err(Error::ConductorError(result.error))
     }
-    //Generate the schema for this struct and register it with conductor
-    async fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, &'static str>
+
+
+    /// Generates the schema for this struct and register it with conductor asynchronously.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: A human friendly name for this producer. This isn't important to conductor and doesn't have to be unique.
+    /// It's stored in the DB and can be useful to identify the producer. And empty string is valid but not recommended.
+    /// * `uuid`: An optional unique ID which will be used to identify this producer. If this is set to None one is generated automatically by
+    /// Conductor. It's recommended to leave this as null and let the server generate the ID.
+    /// * `conductor_domain`: The url of the conductor instance.
+    ///
+    /// # Errors
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `MsgPackSerialisationFailure`: Produced when the emit payload cannot be serialised to the message pack format. This is most likely
+    /// due to a difficulty serialising Self using serde.
+    /// * `NetworkError`: Produced when the http post fails for any reason. Holds the Reqwest Error Struct.
+    /// * `MsgPackDeserializationFailure`: Produced when the emit response couldn't be deserialized from message pack. Holds the
+    /// rmp_serde Error struct.
+    /// * `ConductorError`: Produced when there was an error on the server.
+    ///
+    async fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, Error>
     {
         //TODO handle errors correctly
-        let (payload, url) = match Self::prepare_registration_data(name, uuid, conductor_domain) {
-            Ok(pu) => pu,
-            Err(_) => todo!()
-        };
+        let (payload, url) = Self::prepare_registration_data(name, uuid, conductor_domain)?;
+
         let client = reqwest::Client::new();
         let request = client.post(url)
             .body(payload)
@@ -457,19 +513,36 @@ pub trait AsyncProducer: Base {
             .send().await;
         let response = match request {
             Ok(r) => r,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::NetworkError(err))
         };
         let result: RegistrationResult = match rmp_serde::from_read_ref(response.bytes().await.unwrap().as_ref()) {
             Ok(r) => r,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
+        if result.error != ConductorError::NoError {
+            return Err(Error::ConductorError(result.error));
+        }
         Ok(result.uuid.unwrap())
     }
-    async fn is_registered(uuid: &str, conductor_domain: Url) -> Result<bool, &'static str>
+
+    ///
+    /// Asynchronously checks to see if the UUID has been registered with Conductor.
+    /// This does not verify that the schema registered with the server is correct.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid`: The unique id of this producer which was registered with conductor.
+    /// * `conductor_domain`: The url of the conductor instance.
+    ///
+    /// # Errors
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `NetworkError`: Produced when the http get fails for any reason. Holds the Reqwest Error Struct.
+    ///
+    async fn is_registered(uuid: &str, conductor_domain: Url) -> Result<bool, Error>
     {
         let url = match conductor_domain.join("/v1/producer/check") {
             Ok(u) => u,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::InvalidConductorDomain(format!("The conductor domain was invalid. {}", err)))
         };
         let params = [("uuid", uuid)];
         let client = reqwest::Client::new();
@@ -477,27 +550,38 @@ pub trait AsyncProducer: Base {
             Ok(response) => {
                 Ok(response.status().is_success())
             }
-            Err(_) => todo!()
+            Err(err) => Err(Error::NetworkError(err))
         }
     }
 }
 
-
+///
+/// Provides functions to add Conductor interactions to a type. Turns the implementing type into
+/// a Conductor Producer. This version of the trait provides a blocking version of the functions.
+/// Refer to `conductor::producer::AsyncProducer` for the Asynchronous version.
+///
+/// This should not be implemented directly in most cases.
+/// Instead use the `#[derive(conductor::Producer)]` macro to generate everything for you.
+///
 pub trait Producer: Base {
-    ///
+    /// Send a new data packet to the conductor server.
+    /// Messagepack is used as the format over the wire.
+    /// This function blocks.
     ///
     /// # Arguments
     ///
-    /// * `uuid`:
-    /// * `conductor_url`:
+    /// * `uuid`: The unique id of this producer which was registered with conductor.
+    /// * `conductor_domain`: The url of the conductor instance.
+    ///
     /// # Errors
-    /// returns: Result<(), &str>
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `MsgPackSerialisationFailure`: Produced when the emit payload cannot be serialised to the message pack format. This is most likely
+    /// due to a difficulty serialising Self using serde.
+    /// * `NetworkError`: Produced when the http post fails for any reason. Holds the Reqwest Error Struct.
+    /// * `MsgPackDeserializationFailure`: Produced when the emit response couldn't be deserialized from message pack. Holds the
+    /// rmp_serde Error struct.
+    /// * `ConductorError`: Produced when there was an error on the server.
     ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
     fn emit(&self, uuid: &str, conductor_domain: Url) -> Result<(), Error>
     {
         let (payload, url) = self.generate_emit_data(uuid, conductor_domain)?;
@@ -510,11 +594,11 @@ pub trait Producer: Base {
             .send();
         let response = match request_resp {
             Ok(r) => r,
-            Err(err) => todo!()
+            Err(err) => return Err(Error::NetworkError(err))
         };
         let result: EmitResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
             Ok(r) => r,
-            Err(err) => todo!()
+            Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
         //end blocking specific code
         match &result.error {
@@ -522,30 +606,32 @@ pub trait Producer: Base {
             _ => Err(Error::ConductorError(result.error))
         }
     }
-    ///
+
+    /// Generates the schema for this struct and register it with conductor.
+    /// This function blocks.
     ///
     /// # Arguments
     ///
-    /// * `name`:
-    /// * `uuid`:
-    /// * `conductor_url`:
+    /// * `name`: A human friendly name for this producer. This isn't important to conductor and doesn't have to be unique.
+    /// It's stored in the DB and can be useful to identify the producer. And empty string is valid but not recommended.
+    /// * `uuid`: An optional unique ID which will be used to identify this producer. If this is set to None one is generated automatically by
+    /// Conductor. It's recommended to leave this as null and let the server generate the ID.
+    /// * `conductor_domain`: The url of the conductor instance.
     ///
-    /// returns: Result<String, &str>
     /// # Errors
-    /// TODO
-    /// # Examples
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `MsgPackSerialisationFailure`: Produced when the emit payload cannot be serialised to the message pack format. This is most likely
+    /// due to a difficulty serialising Self using serde.
+    /// * `NetworkError`: Produced when the http post fails for any reason. Holds the Reqwest Error Struct.
+    /// * `MsgPackDeserializationFailure`: Produced when the emit response couldn't be deserialized from message pack. Holds the
+    /// rmp_serde Error struct.
+    /// * `ConductorError`: Produced when there was an error on the server.
     ///
-    /// ```
-    ///
-    /// ```
-    //Generate the schema for this struct and register it with conductor
-    fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, &'static str>
+    fn register(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<String, Error>
     {
         //TODO handle errors correctly
-        let (payload, url) = match Self::prepare_registration_data(name, uuid, conductor_domain) {
-            Ok(pu) => pu,
-            Err(_) => todo!()
-        };
+        let (payload, url) = Self::prepare_registration_data(name, uuid, conductor_domain)?;
+
         let client = reqwest::blocking::Client::new();
         let request = client.post(url)
             .body(payload)
@@ -553,34 +639,37 @@ pub trait Producer: Base {
             .send();
         let response = match request {
             Ok(r) => r,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::NetworkError(err))
         };
         let result: RegistrationResult = match rmp_serde::from_read_ref(response.bytes().unwrap().as_ref()) {
             Ok(r) => r,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
+        if result.error != ConductorError::NoError {
+            return Err(Error::ConductorError(result.error));
+        }
         Ok(result.uuid.unwrap())
     }
 
     ///
+    /// Checks to see if the UUID has been registered with Conductor.
+    /// This does not verify that the schema registered with the server is correct.
+    /// This function blocks
     ///
     /// # Arguments
     ///
-    /// * `uuid`:
-    /// * `conductor_base_url`:
+    /// * `uuid`: The unique id of this producer which was registered with conductor.
+    /// * `conductor_domain`: The url of the conductor instance.
     ///
-    /// returns: Result<bool, &str>
     /// # Errors
-    /// # Examples
+    /// * `InvalidConductorDomain`: Produced when the conductor domain is an invalid url.
+    /// * `NetworkError`: Produced when the http get fails for any reason. Holds the Reqwest Error Struct.
     ///
-    /// ```
-    ///
-    /// ```
-    fn is_registered(uuid: &str, conductor_domain: Url) -> Result<bool, &'static str>
+    fn is_registered(uuid: &str, conductor_domain: Url) -> Result<bool, Error>
     {
         let url = match conductor_domain.join("/v1/producer/check") {
             Ok(u) => u,
-            Err(_) => todo!()
+            Err(err) => return Err(Error::InvalidConductorDomain(format!("The conductor domain was invalid. {}", err)))
         };
         let params = [("uuid", uuid)];
         let client = reqwest::blocking::Client::new();
@@ -588,12 +677,27 @@ pub trait Producer: Base {
             Ok(response) => {
                 Ok(response.status().is_success())
             }
-            Err(_) => todo!()
+            Err(err) => Err(Error::NetworkError(err))
         }
     }
 }
 
+/// Provides a function to retrieve conductor data types
 pub trait ToProducerData {
+    /// returns the Conductor data type for this type.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use conductor_shared::producer::{DataTypes, ToProducerData};
+    /// struct CustomInt{}
+    /// impl ToProducerData for CustomInt {
+    ///     fn conductor_data_type() -> DataTypes {
+    ///         DataTypes::Int
+    ///     }
+    /// }
+    /// assert_eq!(CustomInt::conductor_data_type(), DataTypes::Int);
+    /// ```
     fn conductor_data_type() -> DataTypes;
 }
 

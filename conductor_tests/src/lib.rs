@@ -3,6 +3,7 @@ mod tests {
     #[allow(unused_imports)]
     use conductor::producer::{DataTypes, ToProducerData};
     use serde::Serialize;
+
     #[derive(Clone, Debug, Serialize, conductor::Producer)]
     struct TestDerive {
         id: u32,
