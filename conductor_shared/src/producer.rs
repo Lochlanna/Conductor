@@ -104,6 +104,7 @@ impl Registration {
         }
     }
 
+    /// Create a new instance of Registration with an empty schema.
     #[must_use]
     pub fn new_empty(name: String, custom_id: Option<String>) -> Self {
         Self {
@@ -113,15 +114,19 @@ impl Registration {
         }
     }
 
+    /// Get the name of the producer
     #[must_use]
     pub fn get_name(&self) -> &str {
         &self.name
     }
 
+    /// returns true if a uuid has been set.
     #[must_use]
     pub const fn has_custom_id(&self) -> bool {
         self.use_custom_id.is_some()
     }
+
+
     #[must_use]
     pub fn get_custom_id(&self) -> Option<&str> {
         if let Some(c_id) = &self.use_custom_id {
@@ -684,7 +689,7 @@ pub trait Producer: Base {
 
 /// Provides a function to retrieve conductor data types
 pub trait ToProducerData {
-    /// returns the Conductor data type for this type.
+    /// returns the Conductor data type for the implimenting type.
     ///
     /// # Example
     ///
