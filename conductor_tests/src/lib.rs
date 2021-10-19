@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 mod tests {
     #[allow(unused_imports)]
-    use conductor::producer::{DataTypes, ToProducerData};
+    use conductor::producer::{DataTypes, ToProducerData, Base, SchemaBuilder};
     use serde::Serialize;
 
-    #[derive(Clone, Debug, Serialize, conductor::Producer)]
+    #[derive(Clone, Debug, Serialize, conductor::derive::Producer)]
     struct TestDerive {
         id: u32,
         name: String,
@@ -13,12 +13,7 @@ mod tests {
     }
     #[test]
     fn producer_derive() {
-        let test = TestDerive {
-            id: 0,
-            name: "".to_string(),
-            uuid: "".to_string()
-        };
-        let schema = test.generate_schema();
+        let schema = TestDerive::generate_schema();
         assert!(schema.contains_key("id"));
         assert_eq!(schema["id"], DataTypes::Int);
         assert!(schema.contains_key("name"));
@@ -26,5 +21,14 @@ mod tests {
 
         //ignore skipped fields
         assert_eq!(schema.contains_key("_uuid"), false);
+    }
+
+    #[test]
+    fn schema_builder_basic() {
+        let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
+        let mut value = schema.get("hello").expect("expected value wasn't in the schema");
+        assert!(matches!(value, DataTypes::Binary));
+        value = schema.get("hello world").expect("expected value wasn't in the schema");
+        assert!(matches!(value, DataTypes::Bool));
     }
 }

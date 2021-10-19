@@ -8,3 +8,7 @@ edition = "2018"
 [dependencies]
 conductor = { path = "../conductor" }
 serde = { version = "1.0.*", features = ["derive"] }
+
+[dev.dependencies]
+conductor = { path = "../conductor" }
+serde = { version = "1.0.*", features = ["derive"] }

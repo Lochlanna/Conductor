@@ -273,25 +273,26 @@ impl SchemaBuilder {
     }
 }
 
+/// All the errors that can be produced by a producer
 #[derive(Debug)]
 pub enum Error {
     /// The domain given for the conductor instance is invalid in some way
     InvalidConductorDomain(String),
-    /// Indicates a failure to serialize a struct to message pack
+    /// Indicates a failure to serialize a struct to message pack. Contains rmp_serde encoding error
     MsgPackSerialisationFailure(rmp_serde::encode::Error),
-    /// Indicates a failure to serialize a struct to json
+    /// Indicates a failure to serialize a struct to json. Contains serde_json error type
     JsonSerialisationFailure(serde_json::Error),
-    /// Indicates a failure to serialize a struct
+    /// Indicates a failure to serialize a struct. Contains the error given by the serializer.
     GenericSerialisationFailure(Box<dyn std::error::Error>),
     /// Indicates an error which was emitted from the Conductor server (Internal Server Error)
     ConductorError(ConductorError),
-    /// Indicates an issue with the network layer
+    /// Indicates an issue with the network layer. Contains the reqwest error type
     NetworkError(reqwest::Error),
-    /// Indicates a failure to deserialize a struct from message pack
+    /// Indicates a failure to deserialize a struct from message pack. Contains rmp_serde decoding error
     MsgPackDeserializationFailure(rmp_serde::decode::Error),
-    /// Indicates a failure to deserialize a struct from json
+    /// Indicates a failure to deserialize a struct from json. Contains serde_json error type
     JsonDeserializationFailure(serde_json::Error),
-    /// Indicates a failure to deserialize a struct
+    /// Indicates a failure to deserialize a struct. Contains the error given by the serializer.
     GenericDeserializationFailure(Box<dyn std::error::Error>),
 
 }
@@ -757,21 +758,5 @@ time_type;
 impl ToProducerData for time_type {
     fn conductor_data_type() -> DataTypes {
         DataTypes::Time
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::SchemaBuilder;
-    use crate::producer;
-
-
-    #[test]
-    fn schema_builder() {
-        let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
-        let value = schema.get("hello").expect("expected value wasn't in the schema");
-        assert!(matches!(value, producer::DataTypes::Binary));
-        assert!(schema.contains_key("hello"));
     }
 }
