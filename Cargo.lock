@@ -146,8 +146,8 @@ dependencies = [
 name = "conductor"
 version = "0.1.0"
 dependencies = [
+ "conductor_common",
  "conductor_derive",
- "conductor_shared",
 ]
 
 [[package]]
@@ -155,7 +155,7 @@ name = "conductor_app"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "conductor_shared",
+ "conductor_common",
  "log",
  "postgres",
  "rmp-serde",
@@ -169,17 +169,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "conductor_derive"
-version = "0.1.0"
-dependencies = [
- "conductor_shared",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "conductor_shared"
+name = "conductor_common"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -193,6 +183,16 @@ dependencies = [
  "strum",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "conductor_derive"
+version = "0.1.0"
+dependencies = [
+ "conductor_common",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

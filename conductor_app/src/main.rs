@@ -3,6 +3,7 @@ use rocket::fairing::AdHoc;
 use simple_logger::SimpleLogger;
 mod db;
 mod producer;
+mod reactor;
 
 #[macro_use]
 extern crate rocket;

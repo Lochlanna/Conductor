@@ -7,96 +7,21 @@ use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
 use async_trait::async_trait;
 use std::fmt;
 use std::fmt::Formatter;
+use crate::schema;
+use crate::error;
 
-/// Data types supported by conductor
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
-pub enum DataTypes {
-    Int,
-    Float,
-    Time,
-    String,
-    Binary,
-    Bool,
-    Double,
-}
-
-impl DataTypes {
-    /// Converts the enum to a string representation which matches quest db data types.
-    #[must_use]
-    pub const fn to_quest_type_str(&self) -> &str {
-        match self {
-            DataTypes::Int => "long",
-            DataTypes::Float => "float",
-            DataTypes::Time => "timestamp",
-            DataTypes::Binary => "binary",
-            DataTypes::String => "string",
-            DataTypes::Bool => "boolean",
-            DataTypes::Double => "double",
-        }
-    }
-}
-
-/// Errors produced by the Conductor Instance
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub enum ConductorError {
-    /// Indicates that there was no error. This exists to be more compatible with being sent over
-    /// the wire to clients which may not have proper support for options.
-    NoError,
-    /// Indicates that a Producer schema contains a timestamp field which is not allowed as it's generated automatically by Conductor
-    TimestampDefined(String),
-    /// Indicates that an empty schema was sent
-    NoMembers(String),
-    /// Indicates that there was an issue with at least one of the columns in the schema using illegal characters or formatting
-    InvalidColumnNames(String),
-    /// Indicates the schema is too large (> 2_147_483_647)
-    TooManyColumns(String),
-    /// A generic Conductor error
-    InternalError(String),
-    /// The uuid provided was invalid. This could be an invalid custom id during registration or an ID which has not been registered during all other actions.
-    InvalidUuid(String),
-    /// The name provided is empty.
-    NameInvalid(String),
-    /// Attempted to emit data without having first registered the Producer.
-    Unregistered(String),
-    /// The data doesn't match the data type or cannot be converted to that data type
-    InvalidData(String),
-    /// The schema sent in an emit doesn't match the one which was registered.
-    InvalidSchema(String),
-}
-
-impl std::error::Error for ConductorError {}
-
-impl fmt::Display for ConductorError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            ConductorError::NoError => write!(f, "NoError"),
-            ConductorError::TimestampDefined(message) => write!(f, "NoError: {}", message),
-            ConductorError::NoMembers(message) => write!(f, "NoMembers: {}", message),
-            ConductorError::InvalidColumnNames(message) => write!(f, "InvalidColumnNames: {}", message),
-            ConductorError::TooManyColumns(message) => write!(f, "TooManyColumns: {}", message),
-            ConductorError::InternalError(message) => write!(f, "InternalError: {}", message),
-            ConductorError::InvalidUuid(message) => write!(f, "InvalidUuid: {}", message),
-            ConductorError::NameInvalid(message) => write!(f, "NameInvalid: {}", message),
-            ConductorError::Unregistered(message) => write!(f, "Unregistered: {}", message),
-            ConductorError::InvalidData(message) => write!(f, "InvalidData: {}", message),
-            ConductorError::InvalidSchema(message) => write!(f, "InvalidSchema: {}", message),
-        }
-    }
-}
-
-pub type Schema = HashMap<String, DataTypes>;
 
 /// Contains the information required to register a producer with a Conductor server.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Registration {
     name: String,
-    schema: Schema,
+    schema: schema::Schema,
     use_custom_id: Option<String>, // this is to support devices without persistent storage such as an arduino. They can have a custom id
 }
 
 impl Registration {
     #[must_use]
-    pub const fn new(name: String, schema: Schema, custom_id: Option<String>) -> Self {
+    pub const fn new(name: String, schema: schema::Schema, custom_id: Option<String>) -> Self {
         Self {
             name,
             schema,
@@ -146,7 +71,7 @@ impl Registration {
     }
 
     #[must_use]
-    pub const fn get_schema(&self) -> &Schema {
+    pub const fn get_schema(&self) -> &schema::Schema {
         &self.schema
     }
 }
@@ -154,7 +79,7 @@ impl Registration {
 ///The response from the Conductor instance after a registration attempt
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegistrationResult {
-    pub error: ConductorError,
+    pub error: error::ConductorError,
     pub uuid: Option<String>,
 }
 
@@ -194,13 +119,13 @@ impl<'a, T> Emit<'a, T> {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EmitResult {
-    pub error: ConductorError,
+    pub error: error::ConductorError,
 }
 
 /// A struct which assists in building a schema.
 /// Most of the time this won't be necessary as the producer derive macro does this for you.
 pub struct SchemaBuilder {
-    schema: Schema,
+    schema: schema::Schema,
 }
 
 impl Default for SchemaBuilder {
@@ -225,50 +150,50 @@ impl SchemaBuilder {
     }
 
     #[must_use]
-    pub fn add_column(mut self, name: String, col_type: DataTypes) -> Self {
+    pub fn add_column(mut self, name: String, col_type: schema::DataTypes) -> Self {
         self.schema.insert(name, col_type);
         self
     }
 
     #[must_use]
     pub fn add_int(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::Int);
+        self.schema.insert(name, schema::DataTypes::Int);
         self
     }
     #[must_use]
     pub fn add_float(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::Float);
+        self.schema.insert(name, schema::DataTypes::Float);
         self
     }
     #[must_use]
     pub fn add_time(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::Time);
+        self.schema.insert(name, schema::DataTypes::Time);
         self
     }
     #[must_use]
     pub fn add_binary(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::Binary);
+        self.schema.insert(name, schema::DataTypes::Binary);
         self
     }
     #[must_use]
     pub fn add_string(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::String);
+        self.schema.insert(name, schema::DataTypes::String);
         self
     }
     #[must_use]
     pub fn add_bool(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::Bool);
+        self.schema.insert(name, schema::DataTypes::Bool);
         self
     }
     #[must_use]
     pub fn add_double(mut self, name: String) -> Self {
-        self.schema.insert(name, DataTypes::Double);
+        self.schema.insert(name, schema::DataTypes::Double);
         self
     }
 
     #[allow(clippy::missing_const_for_fn)]
     #[must_use]
-    pub fn build(self) -> Schema {
+    pub fn build(self) -> schema::Schema {
         self.schema
     }
 }
@@ -285,7 +210,7 @@ pub enum Error {
     /// Indicates a failure to serialize a struct. Contains the error given by the serializer.
     GenericSerialisationFailure(Box<dyn std::error::Error>),
     /// Indicates an error which was emitted from the Conductor server (Internal Server Error)
-    ConductorError(ConductorError),
+    ConductorError(error::ConductorError),
     /// Indicates an issue with the network layer. Contains the reqwest error type
     NetworkError(reqwest::Error),
     /// Indicates a failure to deserialize a struct from message pack. Contains rmp_serde decoding error
@@ -321,7 +246,7 @@ impl fmt::Display for Error {
 /// Prepares and processes conductor requests and responses.
 ///
 pub trait Base: Serialize + Clone {
-    fn generate_schema() -> HashMap<String, DataTypes>;
+    fn generate_schema() -> HashMap<String, schema::DataTypes>;
 
     ///
     /// Prepares a payload for emitting data. This function doesn't send the payload.
@@ -341,12 +266,13 @@ pub trait Base: Serialize + Clone {
     /// ```
     /// use std::collections::HashMap;
     /// use conductor_shared::producer::{Base, DataTypes};
+    /// use conductor_shared::schema;
     /// #[derive(Clone, Serialize)]
     /// struct Measurement {
     ///     data_point:u8
     /// }
     /// impl Base for Measurement {
-    ///     fn generate_schema() -> HashMap<String, DataTypes> {
+    ///     fn generate_schema() -> HashMap<String, schema::DataTypes> {
     ///         unimplemented!("Not needed for example/test");
     ///     }
     /// }
@@ -396,12 +322,13 @@ pub trait Base: Serialize + Clone {
     /// ```
     /// use std::collections::HashMap;
     /// use conductor_shared::producer::{Base, DataTypes};
+    /// use conductor_shared::schema;
     /// #[derive(Clone, Serialize)]
     /// struct Measurement {
     ///     data_point:u8
     /// }
     /// impl Base for Measurement {
-    ///     fn generate_schema() -> HashMap<String, DataTypes> {
+    ///     fn generate_schema() -> HashMap<String, schema::DataTypes> {
     ///         unimplemented!("Not needed for example/test");
     ///     }
     /// }
@@ -481,7 +408,7 @@ pub trait AsyncProducer: Base {
             Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
         //end async specific code
-        if result.error == ConductorError::NoError {
+        if result.error == error::ConductorError::NoError {
             return Ok(());
         }
         Err(Error::ConductorError(result.error))
@@ -525,7 +452,7 @@ pub trait AsyncProducer: Base {
             Ok(r) => r,
             Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
-        if result.error != ConductorError::NoError {
+        if result.error != error::ConductorError::NoError {
             return Err(Error::ConductorError(result.error));
         }
         Ok(result.uuid.unwrap())
@@ -608,7 +535,7 @@ pub trait Producer: Base {
         };
         //end blocking specific code
         match &result.error {
-            ConductorError::NoError => Ok(()),
+            error::ConductorError::NoError => Ok(()),
             _ => Err(Error::ConductorError(result.error))
         }
     }
@@ -651,7 +578,7 @@ pub trait Producer: Base {
             Ok(r) => r,
             Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
-        if result.error != ConductorError::NoError {
+        if result.error != error::ConductorError::NoError {
             return Err(Error::ConductorError(result.error));
         }
         Ok(result.uuid.unwrap())
@@ -696,15 +623,16 @@ pub trait ToProducerData {
     ///
     /// ```
     /// use conductor_shared::producer::{DataTypes, ToProducerData};
+    /// use conductor_shared::schema;
     /// struct CustomInt{}
     /// impl ToProducerData for CustomInt {
-    ///     fn conductor_data_type() -> DataTypes {
-    ///         DataTypes::Int
+    ///     fn conductor_data_type() -> schema::DataTypes {
+    ///         schema::DataTypes::Int
     ///     }
     /// }
-    /// assert_eq!(CustomInt::conductor_data_type(), DataTypes::Int);
+    /// assert_eq!(CustomInt::conductor_data_type(), schema::DataTypes::Int);
     /// ```
-    fn conductor_data_type() -> DataTypes;
+    fn conductor_data_type() -> schema::DataTypes;
 }
 
 #[duplicate(
@@ -713,8 +641,8 @@ int_type;
 [ i8 ]; [ i16 ]; [ i32 ]; [ i64 ];
 )]
 impl ToProducerData for int_type {
-    fn conductor_data_type() -> DataTypes {
-        DataTypes::Int
+    fn conductor_data_type() -> schema::DataTypes {
+        schema::DataTypes::Int
     }
 }
 
@@ -723,8 +651,8 @@ string_type;
 [ String ]; [ str ];
 )]
 impl ToProducerData for string_type {
-    fn conductor_data_type() -> DataTypes {
-        DataTypes::String
+    fn conductor_data_type() -> schema::DataTypes {
+        schema::DataTypes::String
     }
 }
 
@@ -733,20 +661,20 @@ float_type;
 [ f32 ]; [ f64 ];
 )]
 impl ToProducerData for float_type {
-    fn conductor_data_type() -> DataTypes {
-        DataTypes::Double
+    fn conductor_data_type() -> schema::DataTypes {
+        schema::DataTypes::Double
     }
 }
 
 impl ToProducerData for [u8] {
-    fn conductor_data_type() -> DataTypes {
-        DataTypes::Binary
+    fn conductor_data_type() -> schema::DataTypes {
+        schema::DataTypes::Binary
     }
 }
 
 impl ToProducerData for bool {
-    fn conductor_data_type() -> DataTypes {
-        DataTypes::Bool
+    fn conductor_data_type() -> schema::DataTypes {
+        schema::DataTypes::Bool
     }
 }
 
@@ -756,7 +684,7 @@ time_type;
 [ DateTime < Utc > ];
 )]
 impl ToProducerData for time_type {
-    fn conductor_data_type() -> DataTypes {
-        DataTypes::Time
+    fn conductor_data_type() -> schema::DataTypes {
+        schema::DataTypes::Time
     }
 }

@@ -104,7 +104,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
 
     let body_tokens = quote! {
         impl conductor::producer::Base for #struct_name {
-            fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::producer::DataTypes> {
+            fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::schema::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
                 #(
                     schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_type_vec::conductor_data_type());

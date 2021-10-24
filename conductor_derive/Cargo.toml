@@ -8,7 +8,7 @@ proc-macro = true
 
 [dependencies]
 syn = {version = "1.0", features = ["extra-traits"]}
-conductor_shared = { path = "../conductor_shared" }
+conductor_common = { path = "../conductor_common" }
 quote = "1.0"
 
 proc-macro2 = "1.0"

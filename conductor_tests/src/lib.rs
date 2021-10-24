@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 mod tests {
     #[allow(unused_imports)]
-    use conductor::producer::{DataTypes, ToProducerData, Base, SchemaBuilder};
+    use conductor::producer::{ToProducerData, Base, SchemaBuilder};
+    use conductor::schema::DataTypes;
     use serde::Serialize;
 
     #[derive(Clone, Debug, Serialize, conductor::derive::Producer)]

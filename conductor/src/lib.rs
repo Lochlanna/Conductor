@@ -21,4 +21,4 @@
 //! run the server on a raspberry pi and have Arduino's be either producers or reactors is also a top
 //! priority.
 pub use conductor_derive as derive;
-pub use conductor_shared::*;
+pub use conductor_common::*;
