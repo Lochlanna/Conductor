@@ -75,7 +75,7 @@ fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ty
 ///
 /// # Examples
 /// ```
-/// # use conductor::producer::{DataTypes, ToProducerData};
+/// # use conductor::schema::{DataTypes, ToConductorDataType};
 /// #[derive(Clone, Debug, Serialize, conductor::derive::Producer)]
 /// struct TestDerive {
 ///     id: u32,
@@ -103,7 +103,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
     };
 
     let body_tokens = quote! {
-        impl conductor::producer::Base for #struct_name {
+        impl conductor::schema::ConductorSchema for #struct_name {
             fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::schema::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
                 #(
@@ -112,6 +112,7 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
                 schema
             }
         }
+        impl conductor::producer::Base for #struct_name {}
     };
     let mut tokens = quote! {
         impl conductor::producer::Producer for #struct_name {}

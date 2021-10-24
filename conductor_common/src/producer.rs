@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::{Url};
 use duplicate::duplicate;
-use chrono::{DateTime, Utc, NaiveDate, NaiveDateTime};
+
 #[cfg(feature = "async")]
 use async_trait::async_trait;
 use std::fmt;
@@ -122,82 +122,6 @@ pub struct EmitResult {
     pub error: error::ConductorError,
 }
 
-/// A struct which assists in building a schema.
-/// Most of the time this won't be necessary as the producer derive macro does this for you.
-pub struct SchemaBuilder {
-    schema: schema::Schema,
-}
-
-impl Default for SchemaBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SchemaBuilder {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            schema: std::collections::HashMap::default()
-        }
-    }
-
-    #[must_use]
-    pub fn with_capacity(n: usize) -> Self {
-        Self {
-            schema: HashMap::with_capacity(n)
-        }
-    }
-
-    #[must_use]
-    pub fn add_column(mut self, name: String, col_type: schema::DataTypes) -> Self {
-        self.schema.insert(name, col_type);
-        self
-    }
-
-    #[must_use]
-    pub fn add_int(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::Int);
-        self
-    }
-    #[must_use]
-    pub fn add_float(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::Float);
-        self
-    }
-    #[must_use]
-    pub fn add_time(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::Time);
-        self
-    }
-    #[must_use]
-    pub fn add_binary(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::Binary);
-        self
-    }
-    #[must_use]
-    pub fn add_string(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::String);
-        self
-    }
-    #[must_use]
-    pub fn add_bool(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::Bool);
-        self
-    }
-    #[must_use]
-    pub fn add_double(mut self, name: String) -> Self {
-        self.schema.insert(name, schema::DataTypes::Double);
-        self
-    }
-
-    #[allow(clippy::missing_const_for_fn)]
-    #[must_use]
-    pub fn build(self) -> schema::Schema {
-        self.schema
-    }
-}
-
 /// All the errors that can be produced by a producer
 #[derive(Debug)]
 pub enum Error {
@@ -245,9 +169,7 @@ impl fmt::Display for Error {
 /// Provides functionality that is shared between both the async and blocking versions of the Producer trait.
 /// Prepares and processes conductor requests and responses.
 ///
-pub trait Base: Serialize + Clone {
-    fn generate_schema() -> HashMap<String, schema::DataTypes>;
-
+pub trait Base: Serialize + Clone + crate::schema::ConductorSchema {
     ///
     /// Prepares a payload for emitting data. This function doesn't send the payload.
     ///
@@ -265,17 +187,18 @@ pub trait Base: Serialize + Clone {
     ///
     /// ```
     /// use std::collections::HashMap;
-    /// use conductor_shared::producer::{Base, DataTypes};
-    /// use conductor_shared::schema;
+    /// use conductor_common::producer::Base;
+    /// use conductor_common::schema;
     /// #[derive(Clone, Serialize)]
     /// struct Measurement {
     ///     data_point:u8
     /// }
-    /// impl Base for Measurement {
+    /// impl schema::ConductorSchema for Measurement {
     ///     fn generate_schema() -> HashMap<String, schema::DataTypes> {
     ///         unimplemented!("Not needed for example/test");
     ///     }
     /// }
+    /// impl Base for Measurement {}
     /// let m = Measurement {
     ///     data_point: 10
     /// };
@@ -321,17 +244,18 @@ pub trait Base: Serialize + Clone {
     ///
     /// ```
     /// use std::collections::HashMap;
-    /// use conductor_shared::producer::{Base, DataTypes};
-    /// use conductor_shared::schema;
+    /// use conductor_common::producer::Base;
+    /// use conductor_common::schema;
     /// #[derive(Clone, Serialize)]
     /// struct Measurement {
     ///     data_point:u8
     /// }
-    /// impl Base for Measurement {
+    /// impl schema::ConductorSchema for Measurement {
     ///     fn generate_schema() -> HashMap<String, schema::DataTypes> {
     ///         unimplemented!("Not needed for example/test");
     ///     }
     /// }
+    /// impl Base for Measurement {}
     /// let m = Measurement {
     ///     data_point: 10
     /// };
@@ -615,76 +539,3 @@ pub trait Producer: Base {
     }
 }
 
-/// Provides a function to retrieve conductor data types
-pub trait ToProducerData {
-    /// returns the Conductor data type for the implimenting type.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use conductor_shared::producer::{DataTypes, ToProducerData};
-    /// use conductor_shared::schema;
-    /// struct CustomInt{}
-    /// impl ToProducerData for CustomInt {
-    ///     fn conductor_data_type() -> schema::DataTypes {
-    ///         schema::DataTypes::Int
-    ///     }
-    /// }
-    /// assert_eq!(CustomInt::conductor_data_type(), schema::DataTypes::Int);
-    /// ```
-    fn conductor_data_type() -> schema::DataTypes;
-}
-
-#[duplicate(
-int_type;
-[ u8 ]; [ u16 ]; [ u32 ];
-[ i8 ]; [ i16 ]; [ i32 ]; [ i64 ];
-)]
-impl ToProducerData for int_type {
-    fn conductor_data_type() -> schema::DataTypes {
-        schema::DataTypes::Int
-    }
-}
-
-#[duplicate(
-string_type;
-[ String ]; [ str ];
-)]
-impl ToProducerData for string_type {
-    fn conductor_data_type() -> schema::DataTypes {
-        schema::DataTypes::String
-    }
-}
-
-#[duplicate(
-float_type;
-[ f32 ]; [ f64 ];
-)]
-impl ToProducerData for float_type {
-    fn conductor_data_type() -> schema::DataTypes {
-        schema::DataTypes::Double
-    }
-}
-
-impl ToProducerData for [u8] {
-    fn conductor_data_type() -> schema::DataTypes {
-        schema::DataTypes::Binary
-    }
-}
-
-impl ToProducerData for bool {
-    fn conductor_data_type() -> schema::DataTypes {
-        schema::DataTypes::Bool
-    }
-}
-
-#[duplicate(
-time_type;
-[ NaiveDate ]; [ NaiveDateTime ];
-[ DateTime < Utc > ];
-)]
-impl ToProducerData for time_type {
-    fn conductor_data_type() -> schema::DataTypes {
-        schema::DataTypes::Time
-    }
-}

@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 mod tests {
     #[allow(unused_imports)]
-    use conductor::producer::{ToProducerData, Base, SchemaBuilder};
-    use conductor::schema::DataTypes;
+    use conductor::producer::Base;
+    use conductor::schema::{ToConductorDataType, DataTypes, Builder};
+    use conductor::derive::Producer;
     use serde::Serialize;
 
-    #[derive(Clone, Debug, Serialize, conductor::derive::Producer)]
+    #[derive(Clone, Debug, Serialize, Producer)]
     struct TestDerive {
         id: u32,
         name: String,
@@ -26,7 +27,7 @@ mod tests {
 
     #[test]
     fn schema_builder_basic() {
-        let schema = SchemaBuilder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
+        let schema = Builder::new().add_binary(String::from("hello")).add_bool(String::from("hello world")).build();
         let mut value = schema.get("hello").expect("expected value wasn't in the schema");
         assert!(matches!(value, DataTypes::Binary));
         value = schema.get("hello world").expect("expected value wasn't in the schema");
