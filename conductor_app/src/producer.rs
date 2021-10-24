@@ -32,6 +32,11 @@ pub struct Producer {
     pub schema: String,
 }
 
+///
+/// Converts json into a proper rust type. It does this using the registered schema to understand
+/// the expected type of each field.
+///
+/// TODO Use proper errors here.
 pub fn to_solid_type_from_json(
     val: &serde_json::Value,
     data_type: schema_com::DataTypes,
@@ -99,6 +104,16 @@ pub fn to_solid_type_from_json(
     }
 }
 
+///
+/// Retrieves the registration row for a producer from the database based on it's uuid.
+///
+/// # Errors
+/// * `ConductorError::InvalidUuid` : The uuid is empty
+/// * `ConductorError::Unregistered` : The uuid doesn't exist in the database
+/// * `ConductorError::InternalError` : There were multiple entries in the database for the given
+/// uuid
+/// * `ConductorError::InternalError` : The row couldn't be deserialized.
+///
 async fn get_producer_row(
     db: &db::QuestDbConn,
     #[allow(clippy::ptr_arg)]
@@ -107,12 +122,6 @@ async fn get_producer_row(
     if uuid.is_empty() {
         return log_error_and_get_emit_result!(
             error_com::ConductorError::InvalidUuid("Incoming request had an empty uuid".to_string())
-        );
-    }
-    if uuid.is_empty() {
-        return log_error_and_get_emit_result!(
-            error_com::ConductorError::NoMembers(format!("Incoming request had no data with uuid {}",
-            &uuid))
         );
     }
     //check if the uuid is in the db
@@ -172,6 +181,9 @@ async fn get_producer_row(
     }
 }
 
+///
+/// Validates that the producer schema given matches the one that is registered in the database
+///
 fn validate_emit_schema(data: &producer_com::Emit<'_, HashMap<String,serde_json::Value>>, producer: &Producer) -> bool {
     if let Ok(schema) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&producer.schema)
     {
@@ -182,6 +194,9 @@ fn validate_emit_schema(data: &producer_com::Emit<'_, HashMap<String,serde_json:
     false
 }
 
+///
+/// Record a new registration in the database.
+///
 async fn register(db: &db::QuestDbConn, registration: &producer_com::Registration) -> producer_com::RegistrationResult {
     //TODO this should use an option
     let error_code = validate_registration(registration);
