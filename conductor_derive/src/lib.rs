@@ -1,3 +1,6 @@
+//! Contains procedural macros which can be used to rapidly and ergonomically build producers and reactors.
+//! This crate is not intended to be used on it's own but makes up part of the Conductor stack.
+
 extern crate proc_macro;
 use proc_macro::{TokenStream};
 use quote::quote;
@@ -5,6 +8,19 @@ use quote::quote;
 use syn::{DeriveInput, Fields, Data};
 use syn::spanned::Spanned;
 use quote::TokenStreamExt;
+
+///
+/// Generates a list of tuples which contain the name, type and any annotations on each named
+/// field on a struct.
+///
+/// # Errors
+/// * If the given input is not a struct then an error is generated.
+/// * If the given input doesn't have named fields then an error is generated.
+///
+/// # Arguments
+///
+/// * `item`: The input tokens to be processed.
+///
 
 fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Type> , &syn::Ident), TokenStream> {
     let struct_name = &item.ident;
@@ -41,26 +57,45 @@ fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ty
 }
 
 ///
+/// This macro implements at least `conductor::producer::base` as well as the default implementation
+/// of the blocking version of the producer trait. If Async is enabled the async version is also
+/// implemented. This macro will only work on a struct with named fields.
 ///
-/// # Arguments
-///TODO
-/// * `input`:
-///
-/// returns: `TokenStream`
+/// Specifically this macro implements the generate_schema function which returns the conductor
+/// schema for the struct. It's a static function and can therefore be defined at compile time.
+/// It uses the named members of the struct as long as they have not been annotated with the
+///  `#[producer_skip_field]` annotation. Members with this annotation will be skipped in the schema.
+/// This is useful for storing data such as the conductor UUID in the struct.
 ///
 /// # Panics
-/// TODO
-/// # Examples
-///TODO
-/// ```
+/// It will panic if the token stream provided is not able to be passed.
 ///
+/// # Errors
+/// Errors will be produced if the input is not a struct or if it has not got named fields.
+///
+/// # Examples
+/// ```
+/// # use conductor::schema::{DataTypes, ToConductorDataType};
+/// #[derive(Clone, Debug, Serialize, conductor::derive::Producer)]
+/// struct TestDerive {
+///     id: u32,
+///     name: String,
+///     #[producer_skip_field]
+///     uuid: String
+///  }
+///  let schema = TestDerive::generate_schema();
+///  assert_eq!(schema["id"], DataTypes::Int);
+///  assert_eq!(schema["name"], DataTypes::String);
+///
+///  //ignore skipped fields
+///  assert_eq!(schema.contains_key("uuid"), false);
 /// ```
 #[proc_macro_derive(Producer, attributes(producer_skip_field))]
 pub fn derive_producer(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
     // that we can manipulate
 
-    let item:DeriveInput = syn::parse(input).unwrap();
+    let item:DeriveInput = syn::parse(input).expect("Couldn't pass input tokens");
 
     let (fields_vec, fields_type_vec, struct_name)  = match get_fields_types(&item) {
         Ok(sd) => sd,
@@ -68,8 +103,8 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
     };
 
     let body_tokens = quote! {
-        {
-            fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::producer::DataTypes> {
+        impl conductor::schema::ConductorSchema for #struct_name {
+            fn generate_schema() ->  std::collections::HashMap<std::string::String,conductor::schema::DataTypes> {
                 let mut schema = std::collections::HashMap::new();
                 #(
                     schema.insert(std::string::String::from(stringify!(#fields_vec)), #fields_type_vec::conductor_data_type());
@@ -77,18 +112,18 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
                 schema
             }
         }
+        impl conductor::producer::Base for #struct_name {}
     };
     let mut tokens = quote! {
-        impl conductor::producer::Producer for #struct_name
+        impl conductor::producer::Producer for #struct_name {}
     };
     tokens.append_all(body_tokens.clone());
     #[cfg(feature = "async")]
     {
         tokens.append_all(quote! {
-            impl conductor::producer::AsyncProducer for #struct_name
+            impl conductor::producer::AsyncProducer for #struct_name {}
         });
         tokens.append_all(body_tokens);
     }
-    println!("Tokens {}", tokens);
     tokens.into()
 }
