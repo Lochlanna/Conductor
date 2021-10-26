@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use url::{Url};
-use duplicate::duplicate;
 
 #[cfg(feature = "async")]
 use async_trait::async_trait;
@@ -262,6 +260,7 @@ pub trait Base: Serialize + Clone + crate::schema::ConductorSchema {
     /// let expected:Vec<u8> = vec![3,4,5];
     /// assert_eq!(m, expected);
     /// ```
+    ///
     fn prepare_registration_data(name: &str, uuid: Option<String>, conductor_domain: Url) -> Result<(Vec<u8>, Url), Error> {
         let url = match conductor_domain.join("/v1/producer/register") {
             Ok(u) => u,
