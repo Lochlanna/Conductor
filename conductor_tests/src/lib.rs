@@ -4,6 +4,7 @@ mod tests {
     use conductor::producer::Base;
     use conductor::schema::{ToConductorDataType, DataTypes, Builder};
     use conductor::derive::Producer;
+    use conductor::reactor::Registration;
     use serde::Serialize;
 
     #[derive(Clone, Debug, Serialize, Producer)]

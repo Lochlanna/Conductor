@@ -109,7 +109,17 @@ pub trait ConductorSchema {
     fn generate_schema() -> HashMap<String, DataTypes>;
 }
 
+pub trait SchemaHelpers {
+    fn contains_column(&self, column_name: &str) -> bool;
+}
+
 pub type Schema = HashMap<String, DataTypes>;
+
+impl SchemaHelpers for Schema {
+    fn contains_column(&self, column_name: &str) -> bool {
+        self.contains_key(column_name)
+    }
+}
 
 /// A struct which assists in building a schema.
 /// Most of the time this won't be necessary as the producer derive macro does this for you.
