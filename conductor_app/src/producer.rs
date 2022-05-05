@@ -5,6 +5,7 @@ use rocket::http::Status;
 use rocket::serde::{json::Json, msgpack::MsgPack, Deserialize, Serialize};
 use uuid::Uuid;
 use crate::db;
+use conductor_common;
 use conductor_common::producer as producer_com;
 use conductor_common::schema as schema_com;
 use conductor_common::error as error_com;
@@ -184,7 +185,7 @@ async fn get_producer_row(
 ///
 /// Validates that the producer schema given matches the one that is registered in the database
 ///
-fn validate_emit_schema(data: &producer_com::Emit<'_, HashMap<String,serde_json::Value>>, producer: &Producer) -> bool {
+fn validate_emit_schema(data: &conductor_common::Emit<'_, HashMap<String,serde_json::Value>>, producer: &Producer) -> bool {
     if let Ok(schema) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&producer.schema)
     {
         if schema == *data.get_data() {
@@ -197,48 +198,48 @@ fn validate_emit_schema(data: &producer_com::Emit<'_, HashMap<String,serde_json:
 ///
 /// Record a new registration in the database.
 ///
-async fn register(db: &db::QuestDbConn, registration: &producer_com::Registration) -> producer_com::RegistrationResult {
+async fn register(db: &db::QuestDbConn, registration: &producer_com::Registration) -> conductor_common::RegistrationResult {
     //TODO this should use an option
     let error_code = validate_registration(registration);
     if error_code != error_com::ConductorError::NoError {
-        return producer_com::RegistrationResult {
+        return conductor_common::RegistrationResult {
             error: error_code,
             uuid: None,
         };
     }
 
     match persist_registration(registration, db).await {
-        Ok(uuid) => producer_com::RegistrationResult {
+        Ok(uuid) => conductor_common::RegistrationResult {
             error: error_code,
             uuid: Some(uuid),
         },
-        Err(err) => producer_com::RegistrationResult {
+        Err(err) => conductor_common::RegistrationResult {
             error: err,
             uuid: None,
         },
     }
 }
 
-async fn emit(db: &db::QuestDbConn, data: &producer_com::Emit<'_,HashMap<String,serde_json::Value>>) -> producer_com::EmitResult {
+async fn emit(db: &db::QuestDbConn, data: &conductor_common::Emit<'_,HashMap<String,serde_json::Value>>) -> conductor_common::EmitResult {
     let producer = match get_producer_row(db, data.get_uuid()).await {
         Ok(producer) => producer,
         Err(error_code) => {
-            return producer_com::EmitResult {
+            return conductor_common::EmitResult {
                 error: error_code,
             };
         }
     };
     if !validate_emit_schema(data, &producer) {
-        return producer_com::EmitResult {
+        return conductor_common::EmitResult {
             error: error_com::ConductorError::InvalidSchema("Emitted schema didn't match registered schema".to_string()),
         };
     }
     // we know the schema is good, the uuid is good. The emit is good. Lets do this thing
     match persist_emit(data, db).await {
-        Ok(_) => producer_com::EmitResult {
+        Ok(_) => conductor_common::EmitResult {
             error: error_com::ConductorError::NoError,
         },
-        Err(err) => producer_com::EmitResult { error: err},
+        Err(err) => conductor_common::EmitResult { error: err},
     }
 }
 
@@ -344,7 +345,7 @@ async fn persist_registration(registration: &producer_com::Registration, db: &db
     }
 }
 
-fn get_insert_sql(emit: &producer_com::Emit<'_, HashMap<String,serde_json::Value>>, column_names: &[&String]) -> Result<String, String> {
+fn get_insert_sql(emit: &conductor_common::Emit<'_, HashMap<String,serde_json::Value>>, column_names: &[&String]) -> Result<String, String> {
     if column_names.is_empty() {
         return Err("Insert Sql must have at least one colum but there were none".to_string());
     }
@@ -365,7 +366,7 @@ fn get_insert_sql(emit: &producer_com::Emit<'_, HashMap<String,serde_json::Value
 }
 
 
-async fn persist_emit(emit: &producer_com::Emit<'_, HashMap<String,serde_json::Value>>, db: &db::QuestDbConn) -> Result<(), error_com::ConductorError> {
+async fn persist_emit(emit: &conductor_common::Emit<'_, HashMap<String,serde_json::Value>>, db: &db::QuestDbConn) -> Result<(), error_com::ConductorError> {
     let schema_json = get_producer_row(db, emit.get_uuid()).await?.schema;
     if schema_json.is_empty() {
         return log_error_and_get_emit_result!(
@@ -435,7 +436,7 @@ async fn persist_emit(emit: &producer_com::Emit<'_, HashMap<String,serde_json::V
 pub async fn register_pack(
     conn: db::QuestDbConn,
     data: MsgPack<producer_com::Registration>,
-) -> MsgPack<producer_com::RegistrationResult> {
+) -> MsgPack<conductor_common::RegistrationResult> {
     MsgPack(register(&conn, &data).await)
 }
 
@@ -443,17 +444,17 @@ pub async fn register_pack(
 pub async fn register_json(
     conn: db::QuestDbConn,
     data: Json<producer_com::Registration>,
-) -> Json<producer_com::RegistrationResult> {
+) -> Json<conductor_common::RegistrationResult> {
     Json(register(&conn, &data).await)
 }
 
 #[post("/v1/producer/emit", format = "msgpack", data = "<data>")]
-pub async fn emit_pack(conn: db::QuestDbConn, data: MsgPack<producer_com::Emit<'_, HashMap<String,serde_json::Value>>>) -> MsgPack<producer_com::EmitResult> {
+pub async fn emit_pack(conn: db::QuestDbConn, data: MsgPack<conductor_common::Emit<'_, HashMap<String,serde_json::Value>>>) -> MsgPack<conductor_common::EmitResult> {
     MsgPack(emit(&conn, &data).await)
 }
 
 #[post("/v1/producer/emit", format = "json", data = "<data>")]
-pub async fn emit_json(conn: db::QuestDbConn, data: Json<producer_com::Emit<'_, HashMap<String,serde_json::Value>>>) -> Json<producer_com::EmitResult> {
+pub async fn emit_json(conn: db::QuestDbConn, data: Json<conductor_common::Emit<'_, HashMap<String,serde_json::Value>>>) -> Json<conductor_common::EmitResult> {
     Json(emit(&conn, &data).await)
 }
 

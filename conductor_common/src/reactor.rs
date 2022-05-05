@@ -70,3 +70,7 @@ impl Registration {
         &self.output_schema
     }
 }
+
+pub trait Base: Serialize + Clone + crate::schema::ConductorSchema {
+
+}

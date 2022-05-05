@@ -49,3 +49,45 @@ impl fmt::Display for ConductorError {
         }
     }
 }
+
+
+/// All the errors that can be produced by a producer or a reactor
+#[derive(Debug)]
+pub enum Error {
+    /// The domain given for the conductor instance is invalid in some way
+    InvalidConductorDomain(String),
+    /// Indicates a failure to serialize a struct to message pack. Contains rmp_serde encoding error
+    MsgPackSerialisationFailure(rmp_serde::encode::Error),
+    /// Indicates a failure to serialize a struct to json. Contains serde_json error type
+    JsonSerialisationFailure(serde_json::Error),
+    /// Indicates a failure to serialize a struct. Contains the error given by the serializer.
+    GenericSerialisationFailure(Box<dyn std::error::Error>),
+    /// Indicates an error which was emitted from the Conductor server (Internal Server Error)
+    ConductorError(ConductorError),
+    /// Indicates an issue with the network layer. Contains the reqwest error type
+    NetworkError(reqwest::Error),
+    /// Indicates a failure to deserialize a struct from message pack. Contains rmp_serde decoding error
+    MsgPackDeserializationFailure(rmp_serde::decode::Error),
+    /// Indicates a failure to deserialize a struct from json. Contains serde_json error type
+    JsonDeserializationFailure(serde_json::Error),
+    /// Indicates a failure to deserialize a struct. Contains the error given by the serializer.
+    GenericDeserializationFailure(Box<dyn std::error::Error>),
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::InvalidConductorDomain(message) => write!(f, "InvalidConductorDomain: {}", message),
+            Error::MsgPackSerialisationFailure(encode_error) => write!(f, "MsgPackSerialisationFailure: {}", encode_error),
+            Error::ConductorError(ce) => write!(f, "ConductorError: {}", ce),
+            Error::NetworkError(re) => write!(f, "NetworkError: {}", re),
+            Error::MsgPackDeserializationFailure(decode_error) => write!(f, "MsgPackDeserializationFailure: {}", decode_error),
+            Error::JsonSerialisationFailure(encode_error) => write!(f, "JsonSerialisationFailure: {}", encode_error),
+            Error::GenericSerialisationFailure(encode_error) => write!(f, "GenericSerialisationFailure: {}", encode_error),
+            Error::JsonDeserializationFailure(decode_error) => write!(f, "JsonDeserializationFailure: {}", decode_error),
+            Error::GenericDeserializationFailure(decode_error) => write!(f, "GenericDeserializationFailure: {}", decode_error),
+        }
+    }
+}

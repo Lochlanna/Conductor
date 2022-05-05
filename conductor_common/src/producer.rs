@@ -3,10 +3,8 @@ use url::{Url};
 
 #[cfg(feature = "async")]
 use async_trait::async_trait;
-use std::fmt;
-use std::fmt::Formatter;
-use crate::schema;
-use crate::error;
+use crate::{EmitResult, Emit, RegistrationResult, schema};
+use crate::error::{Error, ConductorError};
 
 
 /// Contains the information required to register a producer with a Conductor server.
@@ -74,95 +72,6 @@ impl Registration {
     }
 }
 
-///The response from the Conductor instance after a registration attempt
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RegistrationResult {
-    pub error: error::ConductorError,
-    pub uuid: Option<String>,
-}
-
-/// A new data packet to be sent to the Conductor instance
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Emit<'a, T> {
-    uuid: &'a str,
-    timestamp: Option<u64>,
-    data: T,
-}
-
-impl<'a, T> Emit<'a, T> {
-    #[must_use]
-    pub const fn new(uuid: &'a str, timestamp: Option<u64>, data: T) -> Self {
-        Self {
-            uuid,
-            timestamp,
-            data,
-        }
-    }
-
-    #[must_use]
-    pub const fn get_uuid(&self) -> &str {
-        self.uuid
-    }
-
-    #[must_use]
-    pub const fn get_timestamp(&self) -> Option<u64> {
-        self.timestamp
-    }
-
-    #[must_use]
-    pub const fn get_data(&self) -> &T {
-        &self.data
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EmitResult {
-    pub error: error::ConductorError,
-}
-
-/// All the errors that can be produced by a producer
-#[derive(Debug)]
-pub enum Error {
-    /// The domain given for the conductor instance is invalid in some way
-    InvalidConductorDomain(String),
-    /// Indicates a failure to serialize a struct to message pack. Contains rmp_serde encoding error
-    MsgPackSerialisationFailure(rmp_serde::encode::Error),
-    /// Indicates a failure to serialize a struct to json. Contains serde_json error type
-    JsonSerialisationFailure(serde_json::Error),
-    /// Indicates a failure to serialize a struct. Contains the error given by the serializer.
-    GenericSerialisationFailure(Box<dyn std::error::Error>),
-    /// Indicates an error which was emitted from the Conductor server (Internal Server Error)
-    ConductorError(error::ConductorError),
-    /// Indicates an issue with the network layer. Contains the reqwest error type
-    NetworkError(reqwest::Error),
-    /// Indicates a failure to deserialize a struct from message pack. Contains rmp_serde decoding error
-    MsgPackDeserializationFailure(rmp_serde::decode::Error),
-    /// Indicates a failure to deserialize a struct from json. Contains serde_json error type
-    JsonDeserializationFailure(serde_json::Error),
-    /// Indicates a failure to deserialize a struct. Contains the error given by the serializer.
-    GenericDeserializationFailure(Box<dyn std::error::Error>),
-
-}
-
-
-impl std::error::Error for Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::InvalidConductorDomain(message) => write!(f, "InvalidConductorDomain: {}", message),
-            Error::MsgPackSerialisationFailure(encode_error) => write!(f, "MsgPackSerialisationFailure: {}", encode_error),
-            Error::ConductorError(ce) => write!(f, "ConductorError: {}", ce),
-            Error::NetworkError(re) => write!(f, "NetworkError: {}", re),
-            Error::MsgPackDeserializationFailure(decode_error) => write!(f, "MsgPackDeserializationFailure: {}", decode_error),
-            Error::JsonSerialisationFailure(encode_error) => write!(f, "JsonSerialisationFailure: {}", encode_error),
-            Error::GenericSerialisationFailure(encode_error) => write!(f, "GenericSerialisationFailure: {}", encode_error),
-            Error::JsonDeserializationFailure(decode_error) => write!(f, "JsonDeserializationFailure: {}", decode_error),
-            Error::GenericDeserializationFailure(decode_error) => write!(f, "GenericDeserializationFailure: {}", decode_error),
-        }
-    }
-}
-
 ///
 /// Provides functionality that is shared between both the async and blocking versions of the Producer trait.
 /// Prepares and processes conductor requests and responses.
@@ -208,11 +117,7 @@ pub trait Base: Serialize + Clone + crate::schema::ConductorSchema {
             Ok(u) => u,
             Err(err) => return Err(Error::InvalidConductorDomain(format!("The conductor domain was invalid. {}", err)))
         };
-        let emit: Emit<Self> = Emit {
-            uuid,
-            timestamp: None,
-            data: self.clone(),
-        };
+        let emit: Emit<Self> = Emit::new(uuid, None, self.clone());
         let payload = match rmp_serde::to_vec_named(&emit) {
             Ok(p) => p,
             Err(err) => {
@@ -331,7 +236,7 @@ pub trait AsyncProducer: Base {
             Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
         //end async specific code
-        if result.error == error::ConductorError::NoError {
+        if result.error == ConductorError::NoError {
             return Ok(());
         }
         Err(Error::ConductorError(result.error))
@@ -375,7 +280,7 @@ pub trait AsyncProducer: Base {
             Ok(r) => r,
             Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
-        if result.error != error::ConductorError::NoError {
+        if result.error != ConductorError::NoError {
             return Err(Error::ConductorError(result.error));
         }
         Ok(result.uuid.unwrap())
@@ -458,7 +363,7 @@ pub trait Producer: Base {
         };
         //end blocking specific code
         match &result.error {
-            error::ConductorError::NoError => Ok(()),
+            ConductorError::NoError => Ok(()),
             _ => Err(Error::ConductorError(result.error))
         }
     }
@@ -501,7 +406,7 @@ pub trait Producer: Base {
             Ok(r) => r,
             Err(err) => return Err(Error::MsgPackDeserializationFailure(err))
         };
-        if result.error != error::ConductorError::NoError {
+        if result.error != ConductorError::NoError {
             return Err(Error::ConductorError(result.error));
         }
         Ok(result.uuid.unwrap())
