@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use crate::schema;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Registration {
+pub struct ActionRegistration {
     name: String,
     input_schema: schema::Schema,
     output_schema: Option<schema::Schema>,
     use_custom_id: Option<String>
 }
 
-impl Registration {
+impl ActionRegistration {
     pub fn new(name: String, input_schema: schema::Schema, output_schema: Option<schema::Schema>, custom_id: Option<String>) -> Self {
         Self {
             name,
@@ -71,6 +72,36 @@ impl Registration {
     }
 }
 
-pub trait Base: Serialize + Clone + crate::schema::ConductorSchema {
+pub struct Action<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned> {
+    input_data: I,
+    output_data: O,
+    custom_id: Option<String>,
+    name: String
+}
+impl<I: schema::ConductorSchema + Serialize + DeserializeOwned,O: schema::ConductorSchema + Serialize + DeserializeOwned> Action<I, O> {
+    pub fn new(input_data: I, output_data: O, custom_id: Option<String>, name: String) -> Self {
+        Self { input_data, output_data, custom_id, name }
+    }
 
+    pub fn input_data(&self) -> &I {
+        &self.input_data
+    }
+    pub fn input_schema() -> schema::Schema {
+        I::generate_schema()
+    }
+    pub fn output_data(&self) -> &O {
+        &self.output_data
+    }
+    pub fn output_schema() -> schema::Schema {
+        O::generate_schema()
+    }
+    pub fn custom_id(&self) -> Option<&str> {
+        match &self.custom_id {
+            None => None,
+            Some(id) => Some(id)
+        }
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
