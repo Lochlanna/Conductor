@@ -72,7 +72,7 @@ impl ActionRegistration {
     }
 }
 
-pub trait Action<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned> {
+pub trait Action<I, O> {
     fn input_data(&self) -> &I;
     fn input_schema() -> schema::Schema;
     fn output_data(&self) -> &O;
@@ -93,7 +93,10 @@ impl<I,O> BasicAction<I, O> {
     }
 }
 
-impl<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned> Action<I, O> for BasicAction<I, O> {
+impl<I, O> Action<I, O> for BasicAction<I, O>
+    where I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned
+ {
+
     fn input_data(&self) -> &I{
         &self.input_data
     }
@@ -114,5 +117,41 @@ impl<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::Condu
     }
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use crate::reactor::BasicAction;
+    use crate::reactor::Action;
+    use crate::schema::{ConductorSchema, DataTypes};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Deserialize, Serialize)]
+    struct empty{
+        hello: u8
+    }
+    impl ConductorSchema for empty {
+        fn generate_schema() -> HashMap<String, DataTypes> {
+            let mut x = HashMap::new();
+            x.insert(String::from("hello"), DataTypes::Double);
+            x
+        }
+    }
+
+    #[test]
+    fn test_new_action() {
+        let a = BasicAction {
+            input_data: empty{hello:8},
+            output_data: empty{hello:8},
+            custom_id: None,
+            name: "the name".to_string()
+        };
+        a.input_data();
+        let x = BasicAction::<empty, empty>::input_schema();
+        assert!(x.contains_key("hello"));
+        assert!(x.get("hello").is_some() && *x.get("hello").unwrap() == DataTypes::Double);
     }
 }
