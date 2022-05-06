@@ -3,11 +3,11 @@ mod tests {
     #[allow(unused_imports)]
     use conductor::producer::Base;
     use conductor::schema::{ToConductorDataType, DataTypes, Builder};
-    use conductor::derive::Producer;
-    use conductor::reactor::Registration;
+    use conductor::derive::ConductorSchema;
+    use conductor::reactor::ActionRegistration;
     use serde::Serialize;
 
-    #[derive(Clone, Debug, Serialize, Producer)]
+    #[derive(Clone, Debug, Serialize, ConductorSchema)]
     struct TestDerive {
         id: u32,
         name: String,

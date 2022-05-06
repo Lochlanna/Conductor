@@ -72,36 +72,47 @@ impl ActionRegistration {
     }
 }
 
-pub struct Action<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned> {
+pub trait Action<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned> {
+    fn input_data(&self) -> &I;
+    fn input_schema() -> schema::Schema;
+    fn output_data(&self) -> &O;
+    fn output_schema() -> schema::Schema;
+    fn custom_id(&self) -> Option<&str>;
+    fn name(&self) -> &str;
+}
+
+pub struct BasicAction<I, O> {
     input_data: I,
     output_data: O,
     custom_id: Option<String>,
     name: String
 }
-impl<I: schema::ConductorSchema + Serialize + DeserializeOwned,O: schema::ConductorSchema + Serialize + DeserializeOwned> Action<I, O> {
+impl<I,O> BasicAction<I, O> {
     pub fn new(input_data: I, output_data: O, custom_id: Option<String>, name: String) -> Self {
         Self { input_data, output_data, custom_id, name }
     }
+}
 
-    pub fn input_data(&self) -> &I {
+impl<I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned> Action<I, O> for BasicAction<I, O> {
+    fn input_data(&self) -> &I{
         &self.input_data
     }
-    pub fn input_schema() -> schema::Schema {
+    fn input_schema() -> schema::Schema {
         I::generate_schema()
     }
-    pub fn output_data(&self) -> &O {
+    fn output_data(&self) -> &O {
         &self.output_data
     }
-    pub fn output_schema() -> schema::Schema {
+    fn output_schema() -> schema::Schema {
         O::generate_schema()
     }
-    pub fn custom_id(&self) -> Option<&str> {
+    fn custom_id(&self) -> Option<&str> {
         match &self.custom_id {
             None => None,
             Some(id) => Some(id)
         }
     }
-    pub fn name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
 }

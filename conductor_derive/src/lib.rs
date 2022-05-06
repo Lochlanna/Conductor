@@ -76,7 +76,7 @@ fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ty
 /// # Examples
 /// ```
 /// # use conductor::schema::{DataTypes, ToConductorDataType};
-/// #[derive(Clone, Debug, Serialize, conductor::derive::Producer)]
+/// #[derive(Clone, Debug, Serialize, conductor::derive::ConductorSchema)]
 /// struct TestDerive {
 ///     id: u32,
 ///     name: String,
@@ -90,7 +90,7 @@ fn get_fields_types(item:&DeriveInput) -> Result<(Vec<&syn::Ident>, Vec<&syn::Ty
 ///  //ignore skipped fields
 ///  assert_eq!(schema.contains_key("uuid"), false);
 /// ```
-#[proc_macro_derive(Producer, attributes(producer_skip_field))]
+#[proc_macro_derive(ConductorSchema, attributes(producer_skip_field))]
 pub fn derive_producer(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
     // that we can manipulate
@@ -112,18 +112,6 @@ pub fn derive_producer(input: TokenStream) -> TokenStream {
                 schema
             }
         }
-        impl conductor::producer::Base for #struct_name {}
     };
-    let mut tokens = quote! {
-        impl conductor::producer::Producer for #struct_name {}
-    };
-    tokens.append_all(body_tokens.clone());
-    #[cfg(feature = "async")]
-    {
-        tokens.append_all(quote! {
-            impl conductor::producer::AsyncProducer for #struct_name {}
-        });
-        tokens.append_all(body_tokens);
-    }
-    tokens.into()
+    body_tokens.into()
 }
