@@ -72,44 +72,40 @@ impl ActionRegistration {
     }
 }
 
-pub trait Action<I, O> {
-    fn input_data(&self) -> &I;
+pub trait Action<I,O> {
     fn input_schema() -> schema::Schema;
-    fn output_data(&self) -> &O;
     fn output_schema() -> schema::Schema;
+    fn run(&self, input: I) -> O;
     fn custom_id(&self) -> Option<&str>;
     fn name(&self) -> &str;
 }
 
 pub struct BasicAction<I, O> {
-    input_data: I,
-    output_data: O,
+    function: fn(I) -> O,
     custom_id: Option<String>,
     name: String
 }
 impl<I,O> BasicAction<I, O> {
-    pub fn new(input_data: I, output_data: O, custom_id: Option<String>, name: String) -> Self {
-        Self { input_data, output_data, custom_id, name }
+    pub fn new(function: fn(I) -> O,custom_id: Option<String>, name: String) -> Self {
+        Self {function, custom_id, name }
     }
 }
 
-impl<I, O> Action<I, O> for BasicAction<I, O>
+impl<I, O> Action<I,O> for BasicAction<I, O>
     where I: schema::ConductorSchema + Serialize + DeserializeOwned, O: schema::ConductorSchema + Serialize + DeserializeOwned
  {
-
-    fn input_data(&self) -> &I{
-        &self.input_data
-    }
     fn input_schema() -> schema::Schema {
         I::generate_schema()
-    }
-    fn output_data(&self) -> &O {
-        &self.output_data
     }
     fn output_schema() -> schema::Schema {
         O::generate_schema()
     }
-    fn custom_id(&self) -> Option<&str> {
+
+     fn run(&self, input: I) -> O {
+         (self.function)(input)
+     }
+
+     fn custom_id(&self) -> Option<&str> {
         match &self.custom_id {
             None => None,
             Some(id) => Some(id)
@@ -119,7 +115,6 @@ impl<I, O> Action<I, O> for BasicAction<I, O>
         &self.name
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -141,15 +136,18 @@ mod tests {
         }
     }
 
+    fn printer(s: empty)->bool{
+        println!("{}", s.hello);
+        true
+    }
+
     #[test]
     fn test_new_action() {
         let a = BasicAction {
-            input_data: empty{hello:8},
-            output_data: empty{hello:8},
+            function: printer,
             custom_id: None,
             name: "the name".to_string()
         };
-        a.input_data();
         let x = BasicAction::<empty, empty>::input_schema();
         assert!(x.contains_key("hello"));
         assert!(x.get("hello").is_some() && *x.get("hello").unwrap() == DataTypes::Double);
